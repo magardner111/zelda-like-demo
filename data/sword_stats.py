@@ -7,5 +7,6 @@ SWORD_STATS = {
         "swing_time": 0.20,
         "afterimage_time": 0.03,
         "damage": 1,
+        "stamina_cost": 15,
     }
 }

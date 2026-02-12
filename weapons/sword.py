@@ -18,6 +18,7 @@ class Sword:
         self.swing_time = data["swing_time"]
         self.afterimage_time = data["afterimage_time"]
         self.damage = data.get("damage", 1)
+        self.stamina_cost = data.get("stamina_cost", 0)
 
         # --- Runtime ---
         self.timer = 0.0
@@ -35,10 +36,13 @@ class Sword:
     def start_attack(self):
         """
         Begin a sword swing.
-        Does nothing if already swinging.
+        Does nothing if already swinging or not enough stamina.
         """
         if self.active:
             return
+        if self.owner.stamina < self.stamina_cost:
+            return
+        self.owner.stamina -= self.stamina_cost
 
         self.active = True
         self.timer = self.swing_time

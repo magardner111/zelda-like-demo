@@ -36,6 +36,13 @@ class Player:
         self.invuln_speed = stats["invuln_speed"]
 
         # -----------------------------
+        # Stamina
+        # -----------------------------
+        self.max_stamina = stats["max_stamina"]
+        self.stamina = self.max_stamina
+        self.stamina_regen = stats["stamina_regen"]
+
+        # -----------------------------
         # Weapons
         # -----------------------------
         self.weapons = {}
@@ -150,6 +157,10 @@ class Player:
             self.knockback_timer -= dt
             self.pos += self.vel * dt
             self.vel *= 0.85
+
+        # Stamina regen
+        if self.stamina < self.max_stamina:
+            self.stamina = min(self.max_stamina, self.stamina + self.stamina_regen * dt)
 
     # =====================================================
     # DRAW

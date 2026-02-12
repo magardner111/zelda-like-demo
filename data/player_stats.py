@@ -10,4 +10,6 @@ PLAYER_STATS = {
     "facing_line_color": (255, 255, 255),
     "facing_line_length": 20,
     "facing_line_offset": 14,
+    "max_stamina": 100,
+    "stamina_regen": 10,
 }
