@@ -4,6 +4,7 @@ import sys
 from settings import WIDTH, HEIGHT, FPS, BACKGROUND_COLOR
 
 from core.camera import Camera
+from core.collision import check_player_enemy_collisions
 from core.input_manager import InputManager
 from core.player_base import Player
 
@@ -66,6 +67,7 @@ def main():
         # -----------------------------
         current_map.update(dt, player)
         player.update(dt, input_manager, current_map.enemies)
+        check_player_enemy_collisions(player, current_map.enemies)
         camera.update(dt)
 
         # -----------------------------

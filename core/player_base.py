@@ -29,6 +29,9 @@ class Player:
         self.knockback_force = stats["knockback_force"]
         self.knockback_timer = 0.0
 
+        self.invuln_freq = stats["invuln_freq"]
+        self.invuln_speed = stats["invuln_speed"]
+
         # -----------------------------
         # Weapons
         # -----------------------------
@@ -105,7 +108,8 @@ class Player:
 
         if move.length_squared() > 0:
             move = move.normalize()
-            self.pos += move * self.speed * dt
+            speed = self.invuln_speed if self.invuln_timer > 0 else self.speed
+            self.pos += move * speed * dt
             self.facing = move
 
     # =====================================================
@@ -151,15 +155,13 @@ class Player:
     # =====================================================
 
     def draw(self, screen, camera):
-        # Flash white while invulnerable
-        color = (255, 255, 255) if self.invuln_timer > 0 else self.color
-
-        pygame.draw.circle(
-            screen,
-            color,
-            camera.apply(self.pos),
-            self.radius
-        )
+        # Blink transparency while invulnerable
+        if self.invuln_timer > 0 and int(self.invuln_timer * self.invuln_freq * 2) % 2 == 0:
+            surf = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*self.color, 128), (self.radius, self.radius), self.radius)
+            screen.blit(surf, camera.apply(self.pos) - pygame.Vector2(self.radius, self.radius))
+        else:
+            pygame.draw.circle(screen, self.color, camera.apply(self.pos), self.radius)
 
         # Draw Sword
         sword = self.weapons.get("sword")
