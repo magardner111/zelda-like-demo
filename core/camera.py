@@ -1,10 +1,13 @@
 import pygame
 import random
 
+from settings import WIDTH, HEIGHT
+
 
 class Camera:
     def __init__(self):
         self.offset = pygame.Vector2(0, 0)
+        self.target = None
 
         # Shake
         self.shake_timer = 0.0
@@ -14,6 +17,10 @@ class Camera:
     # -------------------------
     # Public API
     # -------------------------
+
+    def follow(self, target):
+        """Set the target to follow. Target must have a .pos attribute."""
+        self.target = target
 
     def shake(self, duration=None, strength=None):
         """
@@ -30,8 +37,14 @@ class Camera:
         """
         Update camera each frame.
         """
-        self.offset.update(0, 0)
+        # Center on target
+        if self.target:
+            self.offset.x = WIDTH / 2 - self.target.pos.x
+            self.offset.y = HEIGHT / 2 - self.target.pos.y
+        else:
+            self.offset.update(0, 0)
 
+        # Apply shake on top
         if self.shake_timer > 0:
             self.shake_timer -= dt
 
@@ -39,8 +52,8 @@ class Camera:
                 self.shake_timer / self.shake_duration
             ) * self.shake_strength
 
-            self.offset.x = random.uniform(-intensity, intensity)
-            self.offset.y = random.uniform(-intensity, intensity)
+            self.offset.x += random.uniform(-intensity, intensity)
+            self.offset.y += random.uniform(-intensity, intensity)
 
     def apply(self, position):
         """

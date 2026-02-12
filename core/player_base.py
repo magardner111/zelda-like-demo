@@ -1,5 +1,4 @@
 import pygame
-from settings import WIDTH, HEIGHT
 
 
 class Player:
@@ -96,11 +95,6 @@ class Player:
 
         self.projectiles = [p for p in self.projectiles if not p.destroyed]
 
-        # -----------------------------
-        # Clamp To Screen
-        # -----------------------------
-        self._clamp_to_screen()
-
     # =====================================================
     # MOVEMENT
     # =====================================================
@@ -156,14 +150,6 @@ class Player:
             self.knockback_timer -= dt
             self.pos += self.vel * dt
             self.vel *= 0.85
-
-    # =====================================================
-    # SCREEN BOUNDS
-    # =====================================================
-
-    def _clamp_to_screen(self):
-        self.pos.x = max(self.radius, min(WIDTH - self.radius, self.pos.x))
-        self.pos.y = max(self.radius, min(HEIGHT - self.radius, self.pos.y))
 
     # =====================================================
     # DRAW

@@ -35,6 +35,7 @@ def main():
         position=(WIDTH // 2, HEIGHT // 2),
         stats=PLAYER_STATS
     )
+    camera.follow(player)
 
     # Attach sword
     player.add_weapon(
