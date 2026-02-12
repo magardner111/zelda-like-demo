@@ -43,6 +43,15 @@ class Player:
         self.stamina_regen = stats["stamina_regen"]
 
         # -----------------------------
+        # Dodge
+        # -----------------------------
+        self.dodge_stamina_cost = stats["dodge_stamina_cost"]
+        self.dodge_distance = stats["dodge_distance"]
+        self.dodge_speed = stats["dodge_speed"]
+        self.dodge_remaining = 0.0
+        self.dodge_direction = pygame.Vector2(0, 0)
+
+        # -----------------------------
         # Weapons
         # -----------------------------
         self.weapons = {}
@@ -66,18 +75,28 @@ class Player:
         arrow = self.weapons.get("arrow")
 
         # -----------------------------
-        # Lock Movement & Facing During Attack
+        # Lock Movement & Facing During Attack/Dodge
         # -----------------------------
         attack_active = sword.is_active() if sword else False
+        dodging = self.dodge_remaining > 0
 
-        if not attack_active:
+        if not attack_active and not dodging:
             self._update_facing(input_manager, camera)
             self._handle_movement(dt, input_manager)
 
         # -----------------------------
+        # Dodge Trigger
+        # -----------------------------
+        if input_manager.is_pressed("dodge") and not dodging and not attack_active:
+            if self.stamina >= self.dodge_stamina_cost:
+                self.stamina -= self.dodge_stamina_cost
+                self.dodge_remaining = self.dodge_distance
+                self.dodge_direction = -self.facing
+
+        # -----------------------------
         # Weapon Triggers
         # -----------------------------
-        if sword and input_manager.is_pressed("sword"):
+        if sword and input_manager.is_pressed("sword") and not dodging:
             sword.start_attack()
 
         if arrow and input_manager.is_pressed("arrow"):
@@ -157,6 +176,14 @@ class Player:
             self.knockback_timer -= dt
             self.pos += self.vel * dt
             self.vel *= 0.85
+
+        # Dodge movement
+        if self.dodge_remaining > 0:
+            step = self.dodge_speed * dt
+            if step > self.dodge_remaining:
+                step = self.dodge_remaining
+            self.pos += self.dodge_direction * step
+            self.dodge_remaining -= step
 
         # Stamina regen
         if self.stamina < self.max_stamina:

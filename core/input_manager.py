@@ -13,6 +13,7 @@ class InputManager:
             "move_right": pygame.K_d,
             "sword": pygame.K_SPACE,
             "arrow": pygame.K_e,
+            "dodge": pygame.K_LCTRL,
             "menu": pygame.K_ESCAPE,
         }
 

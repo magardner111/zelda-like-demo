@@ -12,4 +12,7 @@ PLAYER_STATS = {
     "facing_line_offset": 14,
     "max_stamina": 100,
     "stamina_regen": 10,
+    "dodge_stamina_cost": 25,
+    "dodge_distance": 120,
+    "dodge_speed": 600,
 }
