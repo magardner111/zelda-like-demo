@@ -15,4 +15,5 @@ PLAYER_STATS = {
     "dodge_stamina_cost": 25,
     "dodge_distance": 120,
     "dodge_speed": 600,
+    "sneak_speed_factor": 0.4,
 }

@@ -14,6 +14,7 @@ class InputManager:
             "sword": pygame.K_SPACE,
             "arrow": pygame.K_e,
             "dodge": pygame.K_LCTRL,
+            "sneak": pygame.K_LSHIFT,
             "menu": pygame.K_ESCAPE,
         }
 

@@ -52,6 +52,12 @@ class Player:
         self.dodge_direction = pygame.Vector2(0, 0)
 
         # -----------------------------
+        # Sneak
+        # -----------------------------
+        self.sneak_speed_factor = stats["sneak_speed_factor"]
+        self.sneaking = False
+
+        # -----------------------------
         # Weapons
         # -----------------------------
         self.weapons = {}
@@ -79,6 +85,9 @@ class Player:
         # -----------------------------
         attack_active = sword.is_active() if sword else False
         dodging = self.dodge_remaining > 0
+
+        self.sneaking = (not attack_active and not dodging
+                         and input_manager.is_down("sneak"))
 
         if not attack_active and not dodging:
             self._update_facing(input_manager, camera)
@@ -134,6 +143,8 @@ class Player:
         if move.length_squared() > 0:
             move = move.normalize()
             speed = self.invuln_speed if self.invuln_timer > 0 else self.speed
+            if self.sneaking:
+                speed *= self.sneak_speed_factor
             self.pos += move * speed * dt
 
     # =====================================================
@@ -194,13 +205,17 @@ class Player:
     # =====================================================
 
     def draw(self, screen, camera):
+        color = self.color
+        if self.sneaking:
+            color = (color[0] // 2, color[1] // 2, color[2] // 2)
+
         # Blink transparency while invulnerable
         if self.invuln_timer > 0 and int(self.invuln_timer * self.invuln_freq * 2) % 2 == 0:
             surf = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(surf, (*self.color, 128), (self.radius, self.radius), self.radius)
+            pygame.draw.circle(surf, (*color, 128), (self.radius, self.radius), self.radius)
             screen.blit(surf, camera.apply(self.pos) - pygame.Vector2(self.radius, self.radius))
         else:
-            pygame.draw.circle(screen, self.color, camera.apply(self.pos), self.radius)
+            pygame.draw.circle(screen, color, camera.apply(self.pos), self.radius)
 
         # Facing indicator line
         screen_pos = camera.apply(self.pos)
