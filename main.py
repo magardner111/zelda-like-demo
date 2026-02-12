@@ -10,6 +10,7 @@ from core.player_base import Player
 
 from maps import Lvl1Map
 from menus import MainMenu
+from hud import GameHud
 
 from weapons.sword import Sword
 from data.player_stats import PLAYER_STATS
@@ -46,6 +47,7 @@ def main():
     # -----------------------------
     current_map = Lvl1Map()
     menu = MainMenu()
+    hud = GameHud(player)
 
     running = True
 
@@ -76,10 +78,11 @@ def main():
         if menu.active:
             menu.update(input_manager)
 
-            # Draw game underneath, then menu overlay
+            # Draw game underneath, then HUD, then menu overlay
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera)
             player.draw(screen, camera)
+            hud.draw(screen)
             menu.draw(screen)
         else:
             # -----------------------------
@@ -96,6 +99,7 @@ def main():
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera)
             player.draw(screen, camera)
+            hud.draw(screen)
 
         pygame.display.flip()
 
