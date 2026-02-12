@@ -14,6 +14,10 @@ class Player:
         self.speed = stats["speed"]
         self.color = stats["color"]
 
+        self.facing_line_color = stats["facing_line_color"]
+        self.facing_line_length = stats["facing_line_length"]
+        self.facing_line_offset = stats["facing_line_offset"]
+
         # IMPORTANT: default facing UP (matches original sword demo)
         self.facing = pygame.Vector2(0, -1)
 
@@ -173,6 +177,12 @@ class Player:
             screen.blit(surf, camera.apply(self.pos) - pygame.Vector2(self.radius, self.radius))
         else:
             pygame.draw.circle(screen, self.color, camera.apply(self.pos), self.radius)
+
+        # Facing indicator line
+        screen_pos = camera.apply(self.pos)
+        line_start = screen_pos + self.facing * self.facing_line_offset
+        line_end = screen_pos + self.facing * (self.facing_line_offset + self.facing_line_length)
+        pygame.draw.line(screen, self.facing_line_color, line_start, line_end, 2)
 
         # Draw Sword
         sword = self.weapons.get("sword")

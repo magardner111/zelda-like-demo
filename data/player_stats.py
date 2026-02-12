@@ -7,4 +7,7 @@ PLAYER_STATS = {
     "knockback_force": 700,
     "invuln_freq": 10,
     "invuln_speed": 120,
+    "facing_line_color": (255, 255, 255),
+    "facing_line_length": 20,
+    "facing_line_offset": 14,
 }
