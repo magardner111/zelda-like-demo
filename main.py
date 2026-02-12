@@ -9,6 +9,7 @@ from core.input_manager import InputManager
 from core.player_base import Player
 
 from maps import Lvl1Map
+from menus import MainMenu
 
 from weapons.sword import Sword
 from data.player_stats import PLAYER_STATS
@@ -44,6 +45,7 @@ def main():
     # Load Map
     # -----------------------------
     current_map = Lvl1Map()
+    menu = MainMenu()
 
     running = True
 
@@ -63,20 +65,37 @@ def main():
         input_manager.update()
 
         # -----------------------------
-        # Update
+        # Menu toggle
         # -----------------------------
-        current_map.update(dt, player)
-        player.update(dt, input_manager, current_map.enemies, camera)
-        check_player_enemy_collisions(player, current_map.enemies)
-        camera.update(dt)
+        if input_manager.is_pressed("menu"):
+            if menu.active:
+                menu.close(input_manager)
+            else:
+                menu.open(input_manager)
 
-        # -----------------------------
-        # Draw
-        # -----------------------------
-        screen.fill(BACKGROUND_COLOR)
+        if menu.active:
+            menu.update(input_manager)
 
-        current_map.draw(screen, camera)
-        player.draw(screen, camera)
+            # Draw game underneath, then menu overlay
+            screen.fill(BACKGROUND_COLOR)
+            current_map.draw(screen, camera)
+            player.draw(screen, camera)
+            menu.draw(screen)
+        else:
+            # -----------------------------
+            # Update
+            # -----------------------------
+            current_map.update(dt, player)
+            player.update(dt, input_manager, current_map.enemies, camera)
+            check_player_enemy_collisions(player, current_map.enemies)
+            camera.update(dt)
+
+            # -----------------------------
+            # Draw
+            # -----------------------------
+            screen.fill(BACKGROUND_COLOR)
+            current_map.draw(screen, camera)
+            player.draw(screen, camera)
 
         pygame.display.flip()
 

@@ -13,6 +13,7 @@ class InputManager:
             "move_right": pygame.K_d,
             "sword": pygame.K_SPACE,
             "arrow": pygame.K_e,
+            "menu": pygame.K_ESCAPE,
         }
 
         # Initialize key states safely
@@ -24,7 +25,7 @@ class InputManager:
         # -------------------------
         self.mouse_config = {
             "grab": True,
-            "visible": True,
+            "visible": False,
             "dead_zone": 5,
         }
 
