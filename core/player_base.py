@@ -49,8 +49,9 @@ class Player:
     # UPDATE
     # =====================================================
 
-    def update(self, dt, input_manager, enemies):
+    def update(self, dt, input_manager, enemies, camera):
         self._update_timers(dt)
+        self._update_facing(input_manager, camera)
 
         sword = self.weapons.get("sword")
         arrow = self.weapons.get("arrow")
@@ -110,7 +111,17 @@ class Player:
             move = move.normalize()
             speed = self.invuln_speed if self.invuln_timer > 0 else self.speed
             self.pos += move * speed * dt
-            self.facing = move
+
+    # =====================================================
+    # FACING (mouse-based)
+    # =====================================================
+
+    def _update_facing(self, input_manager, camera):
+        mouse_screen = input_manager.get_mouse_pos()
+        mouse_world = mouse_screen - camera.offset
+        direction = mouse_world - self.pos
+        if direction.length() > input_manager.mouse_config["dead_zone"]:
+            self.facing = direction.normalize()
 
     # =====================================================
     # DAMAGE

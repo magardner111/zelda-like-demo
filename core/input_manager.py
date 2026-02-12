@@ -19,6 +19,20 @@ class InputManager:
         self.keys = pygame.key.get_pressed()
         self.prev_keys = self.keys
 
+        # -------------------------
+        # Mouse configuration
+        # -------------------------
+        self.mouse_config = {
+            "grab": True,
+            "visible": True,
+            "dead_zone": 5,
+        }
+
+        pygame.event.set_grab(self.mouse_config["grab"])
+        pygame.mouse.set_visible(self.mouse_config["visible"])
+
+        self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
+
     # =====================================================
     # UPDATE (call once per frame BEFORE player.update)
     # =====================================================
@@ -26,6 +40,7 @@ class InputManager:
     def update(self):
         self.prev_keys = self.keys
         self.keys = pygame.key.get_pressed()
+        self.mouse_pos = pygame.Vector2(pygame.mouse.get_pos())
 
     # =====================================================
     # HELD DOWN (continuous)
@@ -58,3 +73,10 @@ class InputManager:
             return False
 
         return not self.keys[key] and self.prev_keys[key]
+
+    # =====================================================
+    # MOUSE
+    # =====================================================
+
+    def get_mouse_pos(self):
+        return pygame.Vector2(self.mouse_pos)
