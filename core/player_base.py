@@ -55,17 +55,17 @@ class Player:
 
     def update(self, dt, input_manager, enemies, camera):
         self._update_timers(dt)
-        self._update_facing(input_manager, camera)
 
         sword = self.weapons.get("sword")
         arrow = self.weapons.get("arrow")
 
         # -----------------------------
-        # Movement Lock During Sword
+        # Lock Movement & Facing During Attack
         # -----------------------------
-        movement_locked = sword.is_active() if sword else False
+        attack_active = sword.is_active() if sword else False
 
-        if not movement_locked:
+        if not attack_active:
+            self._update_facing(input_manager, camera)
             self._handle_movement(dt, input_manager)
 
         # -----------------------------
