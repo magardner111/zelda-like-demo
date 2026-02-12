@@ -91,6 +91,7 @@ def main():
             # -----------------------------
             current_map.update(dt, player)
             player.update(dt, input_manager, current_map.enemies, camera)
+            current_map.clamp_entity(player)
             check_player_enemy_collisions(player, current_map.enemies)
             camera.update(dt)
 
