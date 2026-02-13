@@ -20,3 +20,13 @@ class FloorLayer:
 
     def get_effect_regions(self):
         return [r for r in self.floor_regions if isinstance(r, LiquidRegion)]
+
+    def has_floor_at(self, pos, radius):
+        """Check if any floor or wall region overlaps the given circle."""
+        for region in self.floor_regions:
+            if region.overlaps_circle(pos, radius):
+                return True
+        for region in self.wall_regions:
+            if region.overlaps_circle(pos, radius):
+                return True
+        return False

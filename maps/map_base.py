@@ -32,6 +32,28 @@ class MapBase:
             enemy.update(dt, player)
         self.enemies = [e for e in self.enemies if e.health > 0]
 
+    def check_fall(self, entity):
+        """If entity is on a layer with no floor beneath, drop to the next layer below."""
+        layer = self.get_layer(entity.current_layer)
+        if layer is None or layer.elevation == 0:
+            return
+        r = getattr(entity, "radius", 0)
+        # Stairways count as floor for both connected layers
+        if layer.has_floor_at(entity.pos, r):
+            return
+        for stairway in self.stairways:
+            if (stairway.from_layer == entity.current_layer or
+                    stairway.to_layer == entity.current_layer):
+                if stairway._overlaps(entity):
+                    return
+        # No floor or stairway — fall to the next layer below
+        best = None
+        for candidate in self.floor_layers:
+            if candidate.elevation < layer.elevation:
+                if best is None or candidate.elevation > best.elevation:
+                    best = candidate
+        entity.current_layer = best.elevation if best else 0
+
     def check_stairway_transitions(self, entity):
         for stairway in self.stairways:
             result = stairway.check_transition(entity)

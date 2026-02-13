@@ -121,6 +121,9 @@ def main():
             # Stairway transitions
             current_map.check_stairway_transitions(player)
 
+            # Fall off upper layers if no floor beneath
+            current_map.check_fall(player)
+
             # Enemy-player collision (same layer only)
             check_player_enemy_collisions(player, enemies_on_layer)
 
