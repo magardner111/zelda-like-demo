@@ -62,25 +62,33 @@ class MapBase:
                 return
 
     def draw(self, screen, camera, view_layer=0):
-        """Draw layer background, floor regions, and stairways."""
-        layer = self.get_layer(view_layer)
-        if layer:
-            # Draw layer background
-            map_rect = pygame.Rect(0, 0, self.width, self.height)
-            screen_rect = map_rect.move(camera.offset)
-            pygame.draw.rect(screen, layer.bg_color, screen_rect)
+        """Draw all layers from 0 up to view_layer. Layer 0 fills its bg;
+        upper layers only draw their regions so lower layers show through gaps."""
+        layers_below = sorted(
+            [l for l in self.floor_layers if l.elevation <= view_layer],
+            key=lambda l: l.elevation,
+        )
 
-            # Draw floor regions
+        for layer in layers_below:
+            # Only the bottom layer fills the entire map background
+            if layer.elevation == 0:
+                map_rect = pygame.Rect(0, 0, self.width, self.height)
+                screen_rect = map_rect.move(camera.offset)
+                pygame.draw.rect(screen, layer.bg_color, screen_rect)
+
             for region in layer.floor_regions:
                 region.draw(screen, camera)
 
-        # Draw stairways
+        # Draw stairways visible on the current layer
         for stairway in self.stairways:
             stairway.draw(screen, camera, view_layer)
 
     def draw_walls(self, screen, camera, view_layer=0):
-        """Draw wall regions on top of entities."""
-        layer = self.get_layer(view_layer)
-        if layer:
+        """Draw wall regions on top of entities for all layers up to view_layer."""
+        layers_below = sorted(
+            [l for l in self.floor_layers if l.elevation <= view_layer],
+            key=lambda l: l.elevation,
+        )
+        for layer in layers_below:
             for region in layer.wall_regions:
                 region.draw(screen, camera)
