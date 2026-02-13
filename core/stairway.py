@@ -7,19 +7,34 @@ class Stairway:
         self.from_layer = from_layer
         self.to_layer = to_layer
         self.color = color
+        self._occupied = set()  # entity ids currently inside the stairway
 
-    def check_transition(self, entity):
-        """Returns to_layer if entity overlaps and is on from_layer, else None."""
+    def _overlaps(self, entity):
         r = getattr(entity, "radius", 0)
         closest_x = max(self.rect.left, min(entity.pos.x, self.rect.right))
         closest_y = max(self.rect.top, min(entity.pos.y, self.rect.bottom))
         dist_sq = (entity.pos.x - closest_x) ** 2 + (entity.pos.y - closest_y) ** 2
+        return dist_sq < r ** 2
 
-        if dist_sq < r ** 2:
-            if entity.current_layer == self.from_layer:
-                return self.to_layer
-            elif entity.current_layer == self.to_layer:
-                return self.from_layer
+    def check_transition(self, entity):
+        """Returns target layer on first overlap, None while still inside or outside."""
+        eid = id(entity)
+        overlapping = self._overlaps(entity)
+
+        if not overlapping:
+            self._occupied.discard(eid)
+            return None
+
+        # Already inside — no repeated transitions
+        if eid in self._occupied:
+            return None
+
+        # First frame of overlap — transition and mark occupied
+        self._occupied.add(eid)
+        if entity.current_layer == self.from_layer:
+            return self.to_layer
+        elif entity.current_layer == self.to_layer:
+            return self.from_layer
         return None
 
     def draw(self, screen, camera, current_layer):
