@@ -47,6 +47,7 @@ def main():
     # Load Map
     # -----------------------------
     current_map = Lvl1Map()
+    camera.set_bounds(current_map.width, current_map.height)
     menu = MainMenu()
     hud = GameHud(player)
 
