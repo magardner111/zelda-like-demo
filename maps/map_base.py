@@ -63,12 +63,14 @@ class MapBase:
 
     def draw(self, screen, camera, view_layer=0):
         """Draw all layers from 0 up to view_layer. Layer 0 fills its bg;
-        upper layers only draw their regions so lower layers show through gaps."""
+        upper layers only draw their regions so lower layers show through gaps.
+        Areas without regions on the current layer are darkened."""
         layers_below = sorted(
             [l for l in self.floor_layers if l.elevation <= view_layer],
             key=lambda l: l.elevation,
         )
 
+        current_layer = None
         for layer in layers_below:
             # Only the bottom layer fills the entire map background
             if layer.elevation == 0:
@@ -76,7 +78,24 @@ class MapBase:
                 screen_rect = map_rect.move(camera.offset)
                 pygame.draw.rect(screen, layer.bg_color, screen_rect)
 
+            if layer.elevation == view_layer:
+                current_layer = layer
+                continue
+
             for region in layer.floor_regions:
+                region.draw(screen, camera)
+
+        # Darken lower layers where the current layer has no regions
+        if view_layer > 0:
+            map_rect = pygame.Rect(0, 0, self.width, self.height)
+            screen_rect = map_rect.move(camera.offset)
+            dark = pygame.Surface((screen_rect.width, screen_rect.height), pygame.SRCALPHA)
+            dark.fill((0, 0, 0, 100))
+            screen.blit(dark, screen_rect.topleft)
+
+        # Draw current layer's floor regions on top at full brightness
+        if current_layer:
+            for region in current_layer.floor_regions:
                 region.draw(screen, camera)
 
         # Draw stairways visible on the current layer

@@ -65,7 +65,7 @@ class Lvl1Map(MapBase):
         # Enclosing walls (with gap for stairway)
         layer.add_wall_region(WallRegion((350, 600, 300, 24), wall))   # top
         layer.add_wall_region(WallRegion((350, 876, 300, 24), wall))   # bottom
-        layer.add_wall_region(WallRegion((350, 600, 24, 300), wall))   # left
+        #layer.add_wall_region(WallRegion((350, 600, 24, 300), wall))   # left
         layer.add_wall_region(WallRegion((626, 600, 24, 120), wall))   # right top
         layer.add_wall_region(WallRegion((626, 780, 24, 120), wall))   # right bottom (gap 720-780)
 
