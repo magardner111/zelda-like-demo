@@ -4,7 +4,11 @@ import sys
 from settings import WIDTH, HEIGHT, FPS, BACKGROUND_COLOR
 
 from core.camera import Camera
-from core.collision import check_player_enemy_collisions
+from core.collision import (
+    check_player_enemy_collisions,
+    resolve_entity_vs_regions,
+    apply_region_effects,
+)
 from core.input_manager import InputManager
 from core.player_base import Player
 
@@ -82,8 +86,9 @@ def main():
 
             # Draw game underneath, then HUD, then menu overlay
             screen.fill(BACKGROUND_COLOR)
-            current_map.draw(screen, camera)
+            current_map.draw(screen, camera, player.current_layer)
             player.draw(screen, camera)
+            current_map.draw_walls(screen, camera, player.current_layer)
             hud.draw(screen)
             menu.draw(screen)
         else:
@@ -91,17 +96,49 @@ def main():
             # Update
             # -----------------------------
             current_map.update(dt, player)
-            player.update(dt, input_manager, current_map.enemies, camera)
+
+            # Get regions for player's current layer
+            layer = current_map.get_layer(player.current_layer)
+            solid_regions = layer.get_solid_regions() if layer else []
+            effect_regions = layer.get_effect_regions() if layer else []
+
+            # Apply liquid/effect regions
+            speed_factor = apply_region_effects(player, effect_regions, dt)
+
+            # Filter enemies to same layer
+            enemies_on_layer = [
+                e for e in current_map.enemies
+                if e.current_layer == player.current_layer
+            ]
+
+            player.update(dt, input_manager, enemies_on_layer, camera, speed_factor)
+
+            # Wall collision
+            resolve_entity_vs_regions(player, solid_regions)
+
             current_map.clamp_entity(player)
-            check_player_enemy_collisions(player, current_map.enemies)
+
+            # Stairway transitions
+            current_map.check_stairway_transitions(player)
+
+            # Enemy-player collision (same layer only)
+            check_player_enemy_collisions(player, enemies_on_layer)
+
             camera.update(dt)
 
             # -----------------------------
             # Draw
             # -----------------------------
             screen.fill(BACKGROUND_COLOR)
-            current_map.draw(screen, camera)
+            current_map.draw(screen, camera, player.current_layer)
+
+            # Draw enemies on current layer
+            for enemy in current_map.enemies:
+                if enemy.current_layer == player.current_layer:
+                    enemy.draw(screen, camera)
+
             player.draw(screen, camera)
+            current_map.draw_walls(screen, camera, player.current_layer)
             hud.draw(screen)
 
         pygame.display.flip()

@@ -58,6 +58,11 @@ class Player:
         self.sneaking = False
 
         # -----------------------------
+        # Layer
+        # -----------------------------
+        self.current_layer = 0
+
+        # -----------------------------
         # Weapons
         # -----------------------------
         self.weapons = {}
@@ -74,7 +79,7 @@ class Player:
     # UPDATE
     # =====================================================
 
-    def update(self, dt, input_manager, enemies, camera):
+    def update(self, dt, input_manager, enemies, camera, speed_factor=1.0):
         self._update_timers(dt)
 
         sword = self.weapons.get("sword")
@@ -91,7 +96,7 @@ class Player:
 
         if not attack_active and not dodging:
             self._update_facing(input_manager, camera)
-            self._handle_movement(dt, input_manager)
+            self._handle_movement(dt, input_manager, speed_factor)
 
         # -----------------------------
         # Dodge Trigger
@@ -134,7 +139,7 @@ class Player:
     # MOVEMENT
     # =====================================================
 
-    def _handle_movement(self, dt, input_manager):
+    def _handle_movement(self, dt, input_manager, speed_factor=1.0):
         move = pygame.Vector2(
             input_manager.is_down("move_right") - input_manager.is_down("move_left"),
             input_manager.is_down("move_down") - input_manager.is_down("move_up"),
@@ -145,6 +150,7 @@ class Player:
             speed = self.invuln_speed if self.invuln_timer > 0 else self.speed
             if self.sneaking:
                 speed *= self.sneak_speed_factor
+            speed *= speed_factor
             self.pos += move * speed * dt
 
     # =====================================================

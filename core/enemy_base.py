@@ -26,6 +26,11 @@ class Enemy:
         self.flash_duration = 0.1
 
         # -----------------------------
+        # Layer
+        # -----------------------------
+        self.current_layer = 0
+
+        # -----------------------------
         # Pattern (None for now)
         # -----------------------------
         self.pattern = None
