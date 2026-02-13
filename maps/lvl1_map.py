@@ -50,6 +50,12 @@ class Lvl1Map(MapBase):
         # Interior wall
         layer.add_wall_region(WallRegion((600, 500, 200, 32), wall))
 
+        # Thin walls around stairway — open on the left side only
+        tw = 4  # thin wall thickness
+        layer.add_wall_region(WallRegion((650, 720 - tw, 40, tw), wall))       # top
+        layer.add_wall_region(WallRegion((650, 780, 40, tw), wall))            # bottom
+        layer.add_wall_region(WallRegion((650, 720 - tw, tw, 60 + tw * 2), wall))  # left
+
         self.add_layer(layer)
 
     def _build_platform(self):
