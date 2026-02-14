@@ -1,6 +1,6 @@
 from maps.map_base import MapBase
 from core.floor_layer import FloorLayer
-from core.stairway import Stairway
+from core.stairway import Stairway, StairDirection
 from core.region_base import WallRegion, FloorRegion, LiquidRegion, ObjectRegion
 from data.region_stats import REGION_STATS
 from enemies.lvl1enemy import Lvl1Enemy
@@ -80,7 +80,8 @@ class Lvl1Map(MapBase):
     def _build_stairways(self):
         # Stairway on the right side of the platform, in the gap
         self.add_stairway(
-            Stairway((650, 720, 40, 60), from_layer=0, to_layer=1)
+            Stairway((650, 720, 40, 60), from_layer=0, to_layer=1,
+                     direction=StairDirection.LEFT)
         )
 
     def _place_enemies(self):
