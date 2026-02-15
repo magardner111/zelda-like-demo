@@ -217,6 +217,8 @@ class MapBase:
 
             for region in layer.floor_regions:
                 region.draw(screen, camera)
+            for region in layer.wall_regions:
+                region.draw(screen, camera)
 
         # Darken lower layers where the current layer has no regions
         if view_layer > 0:
@@ -254,11 +256,11 @@ class MapBase:
         screen.blit(overlay, (0, 0))
 
     def draw_walls(self, screen, camera, view_layer=0):
-        """Draw wall regions on top of entities for all layers up to view_layer."""
-        layers_below = sorted(
-            [l for l in self.floor_layers if l.elevation <= view_layer],
-            key=lambda l: l.elevation,
-        )
-        for layer in layers_below:
-            for region in layer.wall_regions:
-                region.draw(screen, camera)
+        """Draw wall regions on top of entities for the current layer only.
+        Lower-layer walls are drawn during draw() so they sit beneath
+        the current layer's floor and get the darkening overlay."""
+        for layer in self.floor_layers:
+            if layer.elevation == view_layer:
+                for region in layer.wall_regions:
+                    region.draw(screen, camera)
+                break
