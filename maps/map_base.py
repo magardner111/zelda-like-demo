@@ -41,10 +41,11 @@ class MapBase:
                 bg_color=tuple(layer_data["bg_color"]),
             )
             for wr in layer_data["wall_regions"]:
-                layer.add_wall_region(
-                    WallRegion((wr["x"], wr["y"], wr["w"], wr["h"]),
-                               REGION_STATS["wall"])
-                )
+                region = WallRegion((wr["x"], wr["y"], wr["w"], wr["h"]),
+                                    REGION_STATS["wall"])
+                if wr.get("tiles"):
+                    region.load_tiles(wr["tiles"], "wall")
+                layer.add_wall_region(region)
             for fr in layer_data["floor_regions"]:
                 rtype = fr["type"]
                 rect = (fr["x"], fr["y"], fr["w"], fr["h"])
@@ -54,6 +55,8 @@ class MapBase:
                     region = ObjectRegion(rect, rtype, REGION_STATS[rtype])
                 else:
                     region = FloorRegion(rect, rtype, REGION_STATS[rtype])
+                if fr.get("tiles"):
+                    region.load_tiles(fr["tiles"], rtype)
                 layer.add_floor_region(region)
             map_obj.add_layer(layer)
 

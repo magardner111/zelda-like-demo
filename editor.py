@@ -134,9 +134,14 @@ def generate_map_code(data):
 
         for wr in layer["wall_regions"]:
             rect = (wr["x"], wr["y"], wr["w"], wr["h"])
-            lines.append(
-                f'        layer{elev}.add_wall_region(WallRegion({rect}, REGION_STATS["wall"]))'
-            )
+            if wr.get("tiles"):
+                lines.append(f'        _r = WallRegion({rect}, REGION_STATS["wall"])')
+                lines.append(f'        _r.load_tiles({wr["tiles"]!r}, "wall")')
+                lines.append(f"        layer{elev}.add_wall_region(_r)")
+            else:
+                lines.append(
+                    f'        layer{elev}.add_wall_region(WallRegion({rect}, REGION_STATS["wall"]))'
+                )
 
         for fr in layer["floor_regions"]:
             rtype = fr["type"]
@@ -147,9 +152,14 @@ def generate_map_code(data):
                 cls = "ObjectRegion"
             else:
                 cls = "FloorRegion"
-            lines.append(
-                f'        layer{elev}.add_floor_region({cls}({rect}, "{rtype}", REGION_STATS["{rtype}"]))'
-            )
+            if fr.get("tiles"):
+                lines.append(f'        _r = {cls}({rect}, "{rtype}", REGION_STATS["{rtype}"])')
+                lines.append(f'        _r.load_tiles({fr["tiles"]!r}, "{rtype}")')
+                lines.append(f"        layer{elev}.add_floor_region(_r)")
+            else:
+                lines.append(
+                    f'        layer{elev}.add_floor_region({cls}({rect}, "{rtype}", REGION_STATS["{rtype}"]))'
+                )
 
         lines.append(f"        self.add_layer(layer{elev})")
         lines.append("")
@@ -851,6 +861,17 @@ class MapEditor:
             else:
                 self.tool = "enemy"
 
+        # Stairway tool: click existing stairway to select & edit it
+        if self.tool == "stairway" and not override_tool:
+            found = self._hit_test_region(mx, my)
+            if found and found[0] == "stairway":
+                kind, idx, layer_idx = found
+                self.selected_items = [(kind, idx, layer_idx)]
+                self._edit_stairway(idx, layer_idx)
+                self._update_selection_panel()
+                self._redraw_canvas()
+                return
+
         if self.tool == "enemy":
             # Single click places an enemy at grid-snapped position
             snap = not shift_held
@@ -1035,7 +1056,7 @@ class MapEditor:
         self.resize_handle = None
 
     def _on_canvas_double_click(self, event):
-        """Double-click on an enemy selects it and switches to the Enemies tab."""
+        """Double-click on an enemy or stairway opens its editor."""
         mx, my = self._screen_to_map(event.x, event.y)
         found = self._hit_test_region(mx, my)
         if found and found[0] == "enemy":
@@ -1044,6 +1065,16 @@ class MapEditor:
             self.box_select_rect = None
             kind, idx, layer_idx = found
             self.selected_items = [(kind, idx, layer_idx)]
+            self._update_selection_panel()
+            self._redraw_canvas()
+            return "break"
+        if found and found[0] == "stairway":
+            self.action = None
+            self.drag_start = None
+            self.box_select_rect = None
+            kind, idx, layer_idx = found
+            self.selected_items = [(kind, idx, layer_idx)]
+            self._edit_stairway(idx, layer_idx)
             self._update_selection_panel()
             self._redraw_canvas()
             return "break"
@@ -1442,6 +1473,19 @@ class MapEditor:
                 "from_layer": from_l, "to_layer": to_l,
                 "direction": direction,
             })
+            self.dirty = True
+
+    def _edit_stairway(self, idx, layer_idx):
+        """Open the stairway dialog to edit an existing stairway."""
+        layer = self.data["layers"][layer_idx]
+        stairways = layer.get("stairways", [])
+        if idx >= len(stairways):
+            return
+        sw = stairways[idx]
+        dlg = StairwayDialog(self.root, len(self.data["layers"]), initial=sw)
+        if dlg.result:
+            self._push_undo()
+            sw["from_layer"], sw["to_layer"], sw["direction"] = dlg.result
             self.dirty = True
 
     def _add_enemy(self, x, y):
@@ -2461,26 +2505,29 @@ class MapEditor:
 # ---------------------------------------------------------------------------
 
 class StairwayDialog:
-    def __init__(self, parent, num_layers):
+    def __init__(self, parent, num_layers, initial=None):
         self.result = None
         dlg = tk.Toplevel(parent)
         dlg.title("Stairway Properties")
         dlg.transient(parent)
-        dlg.grab_set()
         dlg.resizable(False, False)
 
+        init_from = initial.get("from_layer", 0) if initial else 0
+        init_to = initial.get("to_layer", min(1, num_layers - 1)) if initial else min(1, num_layers - 1)
+        init_dir = initial.get("direction", "left") if initial else "left"
+
         tk.Label(dlg, text="From Layer:").grid(row=0, column=0, padx=4, pady=4, sticky="w")
-        from_var = tk.IntVar(value=0)
+        from_var = tk.IntVar(value=init_from)
         tk.Spinbox(dlg, from_=0, to=max(0, num_layers - 1), textvariable=from_var,
                    width=6).grid(row=0, column=1, padx=4, pady=4)
 
         tk.Label(dlg, text="To Layer:").grid(row=1, column=0, padx=4, pady=4, sticky="w")
-        to_var = tk.IntVar(value=min(1, num_layers - 1))
+        to_var = tk.IntVar(value=init_to)
         tk.Spinbox(dlg, from_=0, to=max(0, num_layers - 1), textvariable=to_var,
                    width=6).grid(row=1, column=1, padx=4, pady=4)
 
         tk.Label(dlg, text="Direction:").grid(row=2, column=0, padx=4, pady=4, sticky="w")
-        dir_var = tk.StringVar(value="left")
+        dir_var = tk.StringVar(value=init_dir)
         ttk.Combobox(dlg, textvariable=dir_var, values=["left", "right", "up", "down"],
                      state="readonly", width=8).grid(row=2, column=1, padx=4, pady=4)
 
@@ -2506,6 +2553,8 @@ class StairwayDialog:
         dh = dlg.winfo_height()
         dlg.geometry(f"+{px + (pw - dw) // 2}+{py + (ph - dh) // 2}")
 
+        dlg.wait_visibility()
+        dlg.grab_set()
         parent.wait_window(dlg)
 
 
