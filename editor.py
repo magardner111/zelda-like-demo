@@ -249,6 +249,7 @@ class MapEditor:
         self.pan_x = 0.0
         self.pan_y = 0.0
         self.pan_start = None  # (screen_x, screen_y, pan_x, pan_y)
+        self._mac_b2_used_right_click = False
 
         self._build_ui()
         self._refresh_layer_list()
@@ -488,7 +489,9 @@ class MapEditor:
         # Right-click always acts as select
         self.canvas.bind("<ButtonPress-3>", self._on_right_click)
         if IS_MAC:
-            self.canvas.bind("<ButtonPress-2>", self._on_right_click)
+            self.canvas.bind("<ButtonPress-2>", self._on_mac_button2_press)
+            self.canvas.bind("<B2-Motion>", self._on_mac_button2_drag)
+            self.canvas.bind("<ButtonRelease-2>", self._on_mac_button2_release)
             self.canvas.bind("<Control-ButtonPress-1>", self._on_right_click)
         self.canvas.bind("<B3-Motion>", self._on_canvas_drag)
         self.canvas.bind("<ButtonRelease-3>", self._on_canvas_release)
@@ -1016,6 +1019,31 @@ class MapEditor:
     def _rects_overlap(self, x1, y1, w1, h1, x2, y2, w2, h2):
         """Test if two rectangles overlap."""
         return not (x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
+
+    # macOS Button-2 handlers: right-click action if tiles selected, otherwise pan
+    def _on_mac_button2_press(self, event):
+        self._mac_b2_used_right_click = False
+        if self.selected_tiles and self.tool_var.get() in ("wall", "floor"):
+            mx, my = self._screen_to_map(event.x, event.y)
+            found = self._hit_test_region(mx, my)
+            if found:
+                kind, idx, layer_idx = found
+                region = self._get_rect_for_item(kind, idx, layer_idx)
+                if region and self._region_type_matches_tile(kind, region):
+                    self._fill_region_tiles(region)
+                    self._redraw_canvas()
+                    self._mac_b2_used_right_click = True
+                    return
+        self._on_pan_press(event)
+
+    def _on_mac_button2_drag(self, event):
+        if not self._mac_b2_used_right_click:
+            self._on_pan_drag(event)
+
+    def _on_mac_button2_release(self, event):
+        if not self._mac_b2_used_right_click:
+            self._on_pan_release(event)
+        self._mac_b2_used_right_click = False
 
     # Pan
     def _on_pan_press(self, event):
