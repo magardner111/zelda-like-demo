@@ -327,7 +327,7 @@ class MapEditor:
         self.notebook.add(self.tools_tab, text="Tools")
 
         self.tool_var = tk.StringVar(value="select")
-        for t in ("select", "wall", "floor", "stairway", "enemy"):
+        for t in ("select", "wall", "floor", "stairway"):
             tk.Radiobutton(self.tools_tab, text=t.title(), variable=self.tool_var,
                            value=t, command=self._on_tool_change).pack(anchor="w")
 
@@ -499,6 +499,7 @@ class MapEditor:
         # Linux scroll events
         self.canvas.bind("<Button-4>", self._on_scroll_linux)
         self.canvas.bind("<Button-5>", self._on_scroll_linux)
+        self.canvas.bind("<Double-Button-1>", self._on_canvas_double_click)
         self.canvas.bind("<Configure>", lambda e: self._redraw_canvas())
 
         # Keyboard shortcuts for tools
@@ -506,13 +507,14 @@ class MapEditor:
         self.root.bind("w", lambda e: self._set_tool("wall"))
         self.root.bind("f", lambda e: self._set_tool("floor"))
         self.root.bind("t", lambda e: self._set_tool("stairway"))
-        self.root.bind("e", lambda e: self._set_tool("enemy"))
+        self.root.bind("e", lambda e: self.notebook.select(self.enemies_tab))
         self.root.bind("<Delete>", lambda e: self._delete_selected())
         if IS_MAC:
             self.root.bind("<BackSpace>", lambda e: self._delete_selected())
         self.root.bind(f"<{MOD_KEY}-c>", lambda e: self._copy_selected())
         self.root.bind(f"<{MOD_KEY}-x>", lambda e: self._cut_selected())
         self.root.bind(f"<{MOD_KEY}-v>", lambda e: self._paste_clipboard())
+        self.root.bind("<Escape>", lambda e: self._on_escape())
 
     # -----------------------------------------------------------------
     # Coordinate transforms
@@ -800,6 +802,8 @@ class MapEditor:
             found = self._hit_test_region(mx, my)
             if found and self._is_enemies_tab_active() and found[0] != "enemy":
                 found = None
+            if found and not self._is_enemies_tab_active() and found[0] == "enemy":
+                found = None
             if found:
                 kind, idx, layer_idx = found
                 item = (kind, idx, layer_idx)
@@ -875,8 +879,16 @@ class MapEditor:
                     if snap:
                         new_x = self._snap(new_x)
                         new_y = self._snap(new_y)
+                    old_x, old_y = r["x"], r["y"]
                     r["x"] = new_x
                     r["y"] = new_y
+                    if r.get("tiles") and (new_x != old_x or new_y != old_y):
+                        shift_dx = new_x - old_x
+                        shift_dy = new_y - old_y
+                        r["tiles"] = {
+                            f"{int(k.split(',')[0]) + shift_dx},{int(k.split(',')[1]) + shift_dy}": v
+                            for k, v in r["tiles"].items()
+                        }
             self._update_selection_panel()
             self._redraw_canvas()
 
@@ -921,6 +933,8 @@ class MapEditor:
                 found = self._find_regions_in_box(bx, by, bw, bh)
                 if self._is_enemies_tab_active():
                     found = [f for f in found if f[0] == "enemy"]
+                else:
+                    found = [f for f in found if f[0] != "enemy"]
                 if shift_held:
                     for item in found:
                         if item in self.selected_items:
@@ -938,6 +952,20 @@ class MapEditor:
         self.move_start_mouse = None
         self.move_start_positions = None
         self.resize_handle = None
+
+    def _on_canvas_double_click(self, event):
+        """Double-click on an enemy selects it and switches to the Enemies tab."""
+        mx, my = self._screen_to_map(event.x, event.y)
+        found = self._hit_test_region(mx, my)
+        if found and found[0] == "enemy":
+            self.action = None
+            self.drag_start = None
+            self.box_select_rect = None
+            kind, idx, layer_idx = found
+            self.selected_items = [(kind, idx, layer_idx)]
+            self._update_selection_panel()
+            self._redraw_canvas()
+            return "break"
 
     def _apply_resize(self, rect, mx, my):
         """Resize a rect based on which handle is being dragged."""
@@ -1020,6 +1048,80 @@ class MapEditor:
         """Test if two rectangles overlap."""
         return not (x1 + w1 <= x2 or x2 + w2 <= x1 or y1 + h1 <= y2 or y2 + h2 <= y1)
 
+    def _filter_tiles_to_rect(self, tiles, rx, ry, rw, rh):
+        """Filter a tiles dict to only entries within the given rect bounds."""
+        if not tiles:
+            return {}
+        result = {}
+        for key, tile_name in tiles.items():
+            tx, ty = map(int, key.split(","))
+            if rx <= tx < rx + rw and ry <= ty < ry + rh:
+                result[key] = tile_name
+        return result
+
+    def _subtract_rect(self, region, cx, cy, cw, ch):
+        """Subtract a rectangle (cx,cy,cw,ch) from a region dict.
+
+        Returns a list of 0-4 sub-region dicts covering the non-overlapping
+        area. Preserves all region properties (e.g. 'type') and filters tiles.
+        """
+        rx, ry, rw, rh = region["x"], region["y"], region["w"], region["h"]
+
+        # No overlap — return original unchanged
+        if not self._rects_overlap(rx, ry, rw, rh, cx, cy, cw, ch):
+            return [region]
+
+        # Fully covered — nothing remains
+        if cx <= rx and cy <= ry and cx + cw >= rx + rw and cy + ch >= ry + rh:
+            return []
+
+        # Base properties to copy (everything except geometry and tiles)
+        base = {k: v for k, v in region.items()
+                if k not in ("x", "y", "w", "h", "tiles")}
+        old_tiles = region.get("tiles")
+        results = []
+
+        # Top strip: above the cut rect
+        if cy > ry:
+            h = cy - ry
+            sub = dict(base, x=rx, y=ry, w=rw, h=h)
+            if old_tiles:
+                sub["tiles"] = self._filter_tiles_to_rect(old_tiles, rx, ry, rw, h)
+            results.append(sub)
+
+        # Bottom strip: below the cut rect
+        if cy + ch < ry + rh:
+            top = cy + ch
+            h = ry + rh - top
+            sub = dict(base, x=rx, y=top, w=rw, h=h)
+            if old_tiles:
+                sub["tiles"] = self._filter_tiles_to_rect(old_tiles, rx, top, rw, h)
+            results.append(sub)
+
+        # Left strip: between top/bottom strips, left of cut rect
+        strip_top = max(ry, cy)
+        strip_bot = min(ry + rh, cy + ch)
+        strip_h = strip_bot - strip_top
+        if strip_h > 0 and cx > rx:
+            w = cx - rx
+            sub = dict(base, x=rx, y=strip_top, w=w, h=strip_h)
+            if old_tiles:
+                sub["tiles"] = self._filter_tiles_to_rect(
+                    old_tiles, rx, strip_top, w, strip_h)
+            results.append(sub)
+
+        # Right strip: between top/bottom strips, right of cut rect
+        if strip_h > 0 and cx + cw < rx + rw:
+            left = cx + cw
+            w = rx + rw - left
+            sub = dict(base, x=left, y=strip_top, w=w, h=strip_h)
+            if old_tiles:
+                sub["tiles"] = self._filter_tiles_to_rect(
+                    old_tiles, left, strip_top, w, strip_h)
+            results.append(sub)
+
+        return results
+
     # macOS Button-2 handlers: right-click action if tiles selected, otherwise pan
     def _on_mac_button2_press(self, event):
         self._mac_b2_used_right_click = False
@@ -1090,6 +1192,10 @@ class MapEditor:
         if self.active_layer_idx >= len(self.data["layers"]):
             return
         layer = self.data["layers"][self.active_layer_idx]
+        # Reject if overlapping any existing wall region
+        for wr in layer["wall_regions"]:
+            if self._rects_overlap(x, y, w, h, wr["x"], wr["y"], wr["w"], wr["h"]):
+                return
         region = {"x": x, "y": y, "w": w, "h": h}
         if self.selected_tiles and self.selected_tile_type == "wall":
             region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
@@ -1099,6 +1205,21 @@ class MapEditor:
         if self.active_layer_idx >= len(self.data["layers"]):
             return
         layer = self.data["layers"][self.active_layer_idx]
+        # Reject if overlapping any existing floor region of the same type
+        for fr in layer["floor_regions"]:
+            if fr["type"] == rtype and self._rects_overlap(
+                    x, y, w, h, fr["x"], fr["y"], fr["w"], fr["h"]):
+                return
+        # Clip existing floor regions of different types
+        new_floors = []
+        for fr in layer["floor_regions"]:
+            if fr["type"] != rtype and self._rects_overlap(
+                    x, y, w, h, fr["x"], fr["y"], fr["w"], fr["h"]):
+                new_floors.extend(self._subtract_rect(fr, x, y, w, h))
+            else:
+                new_floors.append(fr)
+        layer["floor_regions"] = new_floors
+        # Place the new region
         region = {"type": rtype, "x": x, "y": y, "w": w, "h": h}
         if self.selected_tiles and self.selected_tile_type == rtype:
             region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
@@ -1151,6 +1272,10 @@ class MapEditor:
     # -----------------------------------------------------------------
     # Selection management
     # -----------------------------------------------------------------
+    def _on_escape(self):
+        self._clear_selection()
+        self._redraw_canvas()
+
     def _clear_selection(self):
         self.selected_items = []
         self._update_selection_panel()
@@ -1348,8 +1473,6 @@ class MapEditor:
             self.ftype_frame.pack(fill=tk.X, padx=4, pady=4)
         else:
             self.ftype_frame.pack_forget()
-        if tool == "enemy":
-            self.notebook.select(self.enemies_tab)
         self._refresh_tile_picker()
 
     def _on_floor_type_change(self):
