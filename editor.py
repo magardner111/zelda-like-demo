@@ -254,6 +254,13 @@ class MapEditor:
 
         self.dirty = False
 
+        # Undo/redo state
+        self.undo_stack = []      # list of (data_snapshot, active_layer_idx)
+        self.redo_stack = []
+        self._restoring = False   # guard to prevent trace callbacks pushing undo during restore
+        self._prop_undo_timer = None        # debounce timer for name/size changes
+        self._prop_pre_snapshot = None      # pre-edit snapshot for debounced changes
+
         self._build_ui()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._refresh_layer_list()
@@ -273,11 +280,33 @@ class MapEditor:
         filemenu.add_separator()
         filemenu.add_command(label="Export Python...", command=self._export_python)
         menubar.add_cascade(label="File", menu=filemenu)
+
+        # Edit menu
+        self.editmenu = tk.Menu(menubar, tearoff=0)
+        self.editmenu.add_command(label="Undo", command=self._undo,
+                                  accelerator=f"{MOD_LABEL}+Z", state="disabled")
+        self.editmenu.add_command(label="Redo", command=self._redo,
+                                  accelerator=f"{MOD_LABEL}+Shift+Z", state="disabled")
+        self.editmenu.add_separator()
+        self.editmenu.add_command(label="Cut", command=self._cut_selected,
+                                  accelerator=f"{MOD_LABEL}+X")
+        self.editmenu.add_command(label="Copy", command=self._copy_selected,
+                                  accelerator=f"{MOD_LABEL}+C")
+        self.editmenu.add_command(label="Paste", command=self._paste_clipboard,
+                                  accelerator=f"{MOD_LABEL}+V")
+        self.editmenu.add_separator()
+        self.editmenu.add_command(label="Delete", command=self._delete_selected,
+                                  accelerator="Del")
+        menubar.add_cascade(label="Edit", menu=self.editmenu)
+
         self.root.config(menu=menubar)
 
         self.root.bind(f"<{MOD_KEY}-n>", lambda e: self._file_new())
         self.root.bind(f"<{MOD_KEY}-o>", lambda e: self._file_open())
         self.root.bind(f"<{MOD_KEY}-s>", lambda e: self._file_save())
+        self.root.bind(f"<{MOD_KEY}-z>", lambda e: self._undo())
+        self.root.bind(f"<{MOD_KEY}-Shift-Z>", lambda e: self._redo())
+        self.root.bind(f"<{MOD_KEY}-Z>", lambda e: self._redo())  # some platforms send capital Z
 
         # Main pane
         paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -286,6 +315,27 @@ class MapEditor:
         # --- Left panel ---
         left = tk.Frame(paned, width=260)
         paned.add(left, minsize=260)
+
+        # Toolbar with icon buttons
+        self._create_icons()
+        toolbar = tk.Frame(left)
+        toolbar.pack(fill=tk.X, padx=4, pady=(4, 0))
+
+        self.undo_btn = tk.Button(toolbar, image=self.icons["undo"], command=self._undo,
+                                   state="disabled", relief="flat", bd=1, padx=2, pady=2)
+        self.undo_btn.pack(side=tk.LEFT, padx=2)
+        self.redo_btn = tk.Button(toolbar, image=self.icons["redo"], command=self._redo,
+                                   state="disabled", relief="flat", bd=1, padx=2, pady=2)
+        self.redo_btn.pack(side=tk.LEFT, padx=2)
+
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=4, pady=2)
+
+        tk.Button(toolbar, image=self.icons["cut"], command=self._cut_selected,
+                  relief="flat", bd=1, padx=2, pady=2).pack(side=tk.LEFT, padx=2)
+        tk.Button(toolbar, image=self.icons["copy"], command=self._copy_selected,
+                  relief="flat", bd=1, padx=2, pady=2).pack(side=tk.LEFT, padx=2)
+        tk.Button(toolbar, image=self.icons["paste"], command=self._paste_clipboard,
+                  relief="flat", bd=1, padx=2, pady=2).pack(side=tk.LEFT, padx=2)
 
         # Map properties
         prop_frame = tk.LabelFrame(left, text="Map Properties", padx=4, pady=4)
@@ -786,6 +836,7 @@ class MapEditor:
                     ty = self._snap(my) if snap else int(my)
                     if (region["x"] <= tx < region["x"] + region["w"]
                             and region["y"] <= ty < region["y"] + region["h"]):
+                        self._push_undo()
                         tile = random.choice(self.selected_tiles)
                         region.setdefault("tiles", {})[f"{tx},{ty}"] = tile
                         self.dirty = True
@@ -816,6 +867,7 @@ class MapEditor:
             if sel_rect and self.selected_items[0][0] != "enemy":
                 handle = self._hit_test_handles(event.x, event.y, sel_rect)
                 if handle:
+                    self._push_undo()
                     self.action = "resize"
                     self.resize_handle = handle
                     return
@@ -849,6 +901,7 @@ class MapEditor:
 
                 # Start move for all selected items
                 if self.selected_items:
+                    self._push_undo()
                     self.action = "move"
                     self.move_start_mouse = (mx, my)
                     self.move_start_positions = []
@@ -1160,6 +1213,7 @@ class MapEditor:
                 kind, idx, layer_idx = found
                 region = self._get_rect_for_item(kind, idx, layer_idx)
                 if region and self._region_type_matches_tile(kind, region):
+                    self._push_undo()
                     self._fill_region_tiles(region)
                     self.dirty = True
                     self._redraw_canvas()
@@ -1260,6 +1314,7 @@ class MapEditor:
         self._nudge_selected(dir_x * step, dir_y * step)
 
     def _nudge_selected(self, dx, dy):
+        self._push_undo()
         for s_kind, s_idx, s_layer_idx in self.selected_items:
             r = self._get_rect_for_item(s_kind, s_idx, s_layer_idx)
             if not r:
@@ -1339,6 +1394,7 @@ class MapEditor:
         for wr in layer["wall_regions"]:
             if self._rects_overlap(x, y, w, h, wr["x"], wr["y"], wr["w"], wr["h"]):
                 return
+        self._push_undo()
         region = {"x": x, "y": y, "w": w, "h": h}
         if self.selected_tiles and self.selected_tile_type == "wall":
             region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
@@ -1354,6 +1410,7 @@ class MapEditor:
             if fr["type"] == rtype and self._rects_overlap(
                     x, y, w, h, fr["x"], fr["y"], fr["w"], fr["h"]):
                 return
+        self._push_undo()
         # Clip existing floor regions of different types
         new_floors = []
         for fr in layer["floor_regions"]:
@@ -1377,6 +1434,7 @@ class MapEditor:
         # Ask for stairway properties
         dlg = StairwayDialog(self.root, len(self.data["layers"]))
         if dlg.result:
+            self._push_undo()
             from_l, to_l, direction = dlg.result
             layer = self.data["layers"][self.active_layer_idx]
             layer.setdefault("stairways", []).append({
@@ -1403,6 +1461,7 @@ class MapEditor:
                     pass
             pattern = {"type": ptype}
             pattern.update(params)
+        self._push_undo()
         facing = self.efacing_var.get()
         layer.setdefault("enemies", []).append({
             "type": etype,
@@ -1421,7 +1480,10 @@ class MapEditor:
     # Selection management
     # -----------------------------------------------------------------
     def _on_escape(self):
-        self._clear_selection()
+        if self.selected_items:
+            self._clear_selection()
+        else:
+            self._set_tool("select")
         self._redraw_canvas()
 
     def _clear_selection(self):
@@ -1465,6 +1527,7 @@ class MapEditor:
         if not rect or not self.selected_items or self.selected_items[0][0] != "stairway":
             return
         try:
+            self._push_undo()
             rect["from_layer"] = self.stair_from_var.get()
             rect["to_layer"] = self.stair_to_var.get()
             rect["direction"] = self.stair_dir_var.get()
@@ -1476,6 +1539,7 @@ class MapEditor:
     def _delete_selected(self):
         if not self.selected_items:
             return
+        self._push_undo()
         # Delete in reverse index order to avoid index shifting issues
         for kind, idx, layer_idx in sorted(self.selected_items, key=lambda t: t[1], reverse=True):
             if layer_idx is None or layer_idx >= len(self.data["layers"]):
@@ -1522,6 +1586,7 @@ class MapEditor:
         al = self.active_layer_idx
         if al >= len(self.data["layers"]):
             return
+        self._push_undo()
         layer = self.data["layers"][al]
         new_selection = []
         for entry in self.clipboard:
@@ -1583,6 +1648,7 @@ class MapEditor:
             self._redraw_canvas()
 
     def _add_layer(self):
+        self._push_undo()
         elevations = [l["elevation"] for l in self.data["layers"]]
         new_elev = max(elevations) + 1 if elevations else 0
         self.data["layers"].append({
@@ -1602,6 +1668,7 @@ class MapEditor:
             messagebox.showwarning("Cannot Remove", "Must have at least one layer.")
             return
         if self.active_layer_idx < len(self.data["layers"]):
+            self._push_undo()
             self.data["layers"].pop(self.active_layer_idx)
             self.active_layer_idx = max(0, self.active_layer_idx - 1)
             self.dirty = True
@@ -1616,6 +1683,7 @@ class MapEditor:
         initial = rgb_to_hex(*layer["bg_color"])
         result = colorchooser.askcolor(color=initial, title="Layer Background Color")
         if result and result[1]:
+            self._push_undo()
             layer["bg_color"] = list(hex_to_rgb(result[1]))
             self.dirty = True
             self._redraw_canvas()
@@ -1716,6 +1784,7 @@ class MapEditor:
         """When the enemy type combo in Selected Enemy changes, update immediately."""
         enemy = self._get_selected_rect()
         if enemy:
+            self._push_undo()
             enemy["type"] = self.eprop_type_var.get()
             self.dirty = True
         self._refresh_enemy_stats_display(self.eprop_type_var.get())
@@ -1725,6 +1794,7 @@ class MapEditor:
         """When the facing combo in Selected Enemy changes, update immediately."""
         enemy = self._get_selected_rect()
         if enemy:
+            self._push_undo()
             enemy["facing"] = self.eprop_facing_var.get()
             self.dirty = True
         self._redraw_canvas()
@@ -1736,6 +1806,7 @@ class MapEditor:
         enemy = self._get_selected_rect()
         if not enemy:
             return
+        self._push_undo()
         enemy["type"] = self.eprop_type_var.get()
         enemy["facing"] = self.eprop_facing_var.get()
         ptype = self.eprop_pattern_var.get()
@@ -1958,6 +2029,7 @@ class MapEditor:
                 kind, idx, layer_idx = found
                 region = self._get_rect_for_item(kind, idx, layer_idx)
                 if region and self._region_type_matches_tile(kind, region):
+                    self._push_undo()
                     self._fill_region_tiles(region)
                     self.dirty = True
                     self._redraw_canvas()
@@ -1967,10 +2039,16 @@ class MapEditor:
             self._on_canvas_press(event, override_tool="select")
 
     def _on_name_change(self):
+        if self._restoring:
+            return
+        self._debounced_prop_undo()
         self.data["name"] = self.name_var.get()
         self.dirty = True
 
     def _on_map_size_change(self):
+        if self._restoring:
+            return
+        self._debounced_prop_undo()
         try:
             self.data["width"] = self.width_var.get()
             self.data["height"] = self.height_var.get()
@@ -1978,6 +2056,266 @@ class MapEditor:
             self._redraw_canvas()
         except tk.TclError:
             pass
+
+    def _debounced_prop_undo(self):
+        """Capture a pre-edit snapshot on first keystroke, commit after 500ms idle."""
+        if self._prop_pre_snapshot is None:
+            self._prop_pre_snapshot = (copy.deepcopy(self.data), self.active_layer_idx)
+        if self._prop_undo_timer is not None:
+            self.root.after_cancel(self._prop_undo_timer)
+        self._prop_undo_timer = self.root.after(500, self._commit_prop_undo)
+
+    def _commit_prop_undo(self):
+        """Push the captured pre-edit snapshot onto the undo stack."""
+        if self._prop_pre_snapshot is not None:
+            self.undo_stack.append(self._prop_pre_snapshot)
+            if len(self.undo_stack) > 50:
+                self.undo_stack.pop(0)
+            self.redo_stack.clear()
+            self._update_undo_menu_state()
+        self._prop_pre_snapshot = None
+        self._prop_undo_timer = None
+
+    # -----------------------------------------------------------------
+    # Undo / Redo
+    # -----------------------------------------------------------------
+    def _create_icons(self):
+        """Generate 24x24 pixel-art toolbar icons programmatically."""
+        self.icons = {}
+
+        def _make_icon(pixels, color):
+            img = tk.PhotoImage(width=24, height=24)
+            for x, y in pixels:
+                img.put(color, (x, y))
+            return img
+
+        # Undo: curved-left arrow — blue
+        c = "#5599ee"
+        ch = "#88bbff"  # highlight
+        pixels = []
+        # Arc body (thick 2px)
+        arc = [
+            (11,3),(12,3),(13,3),(14,3),
+            (9,4),(10,4),(15,4),(16,4),
+            (8,5),(17,5),
+            (7,6),(17,6),
+            (6,7),(7,7),(17,7),(18,7),
+            (6,8),(18,8),
+            (6,9),(18,9),
+            (6,10),(17,10),(18,10),
+            (6,11),(7,11),(17,11),
+            (7,12),(8,12),(16,12),
+            (9,13),(10,13),(14,13),(15,13),
+            (11,14),(12,14),(13,14),
+            # inner edge
+            (11,5),(12,5),(13,5),(14,5),
+            (10,6),(15,6),
+            (9,7),(9,8),(16,7),(16,8),
+            (8,9),(8,10),(16,9),(16,10),
+            (9,11),(15,11),
+            (10,12),(14,12),
+            (11,13),(12,13),(13,13),
+        ]
+        # Arrowhead pointing left
+        arrow = [
+            (2,9),(3,9),(4,9),
+            (3,8),(4,8),(5,8),
+            (4,7),(5,7),(6,7),
+            (3,10),(4,10),(5,10),
+            (4,11),(5,11),(6,11),
+            (2,10),(3,11),
+            (5,9),(6,9),(7,9),(8,9),
+            (5,10),(6,10),(7,10),(8,10),
+        ]
+        pixels = arc + arrow
+        self.icons["undo"] = _make_icon(pixels, c)
+
+        # Redo: curved-right arrow — blue (mirrored)
+        def mirror_x(pts):
+            return [(23 - x, y) for x, y in pts]
+        self.icons["redo"] = _make_icon(mirror_x(pixels), c)
+
+        # Cut: scissors — red/coral
+        c = "#ee6655"
+        pixels = []
+        # Top-left ring
+        for x, y in [
+            (5,2),(6,2),(7,2),
+            (4,3),(8,3),
+            (3,4),(9,4),
+            (3,5),(9,5),
+            (4,6),(8,6),
+            (5,7),(6,7),(7,7),
+        ]:
+            pixels.append((x, y))
+        # Top-right ring
+        for x, y in [
+            (15,2),(16,2),(17,2),
+            (14,3),(18,3),
+            (13,4),(19,4),
+            (13,5),(19,5),
+            (14,6),(18,6),
+            (15,7),(16,7),(17,7),
+        ]:
+            pixels.append((x, y))
+        # Cross blades
+        for x, y in [
+            (8,8),(9,8),(14,8),(13,8),
+            (9,9),(10,9),(13,9),(12,9),
+            (10,10),(11,10),(12,10),
+            (11,11),
+            (10,12),(11,12),(12,12),
+            (9,13),(10,13),(12,13),(13,13),
+            (8,14),(9,14),(13,14),(14,14),
+            (7,15),(8,15),(14,15),(15,15),
+            (6,16),(7,16),(15,16),(16,16),
+            (5,17),(6,17),(16,17),(17,17),
+            (4,18),(5,18),(17,18),(18,18),
+            (4,19),(18,19),
+            (4,20),(18,20),
+        ]:
+            pixels.append((x, y))
+        self.icons["cut"] = _make_icon(pixels, c)
+
+        # Copy: two overlapping docs — green
+        c = "#55bb77"
+        cd = "#448866"  # darker for back doc
+        img = tk.PhotoImage(width=24, height=24)
+        # Back document
+        for x in range(8, 21):
+            img.put(cd, (x, 1))
+            img.put(cd, (x, 2))
+            img.put(cd, (x, 13))
+            img.put(cd, (x, 14))
+        for y in range(1, 15):
+            img.put(cd, (8, y))
+            img.put(cd, (9, y))
+            img.put(cd, (19, y))
+            img.put(cd, (20, y))
+        # Front document
+        for x in range(3, 16):
+            img.put(c, (x, 8))
+            img.put(c, (x, 9))
+            img.put(c, (x, 21))
+            img.put(c, (x, 22))
+        for y in range(8, 23):
+            img.put(c, (3, y))
+            img.put(c, (4, y))
+            img.put(c, (14, y))
+            img.put(c, (15, y))
+        # Lines on front doc
+        for x in range(6, 13):
+            img.put("#88ddaa", (x, 13))
+            img.put("#88ddaa", (x, 16))
+            img.put("#88ddaa", (x, 19))
+        self.icons["copy"] = img
+
+        # Paste: clipboard — amber
+        c = "#ddaa44"
+        cd = "#bb8833"  # darker for clip
+        img = tk.PhotoImage(width=24, height=24)
+        # Board body
+        for x in range(4, 20):
+            for dy in range(2):
+                img.put(c, (x, 5 + dy))
+                img.put(c, (x, 21 + dy))
+        for y in range(5, 23):
+            img.put(c, (4, y))
+            img.put(c, (5, y))
+            img.put(c, (18, y))
+            img.put(c, (19, y))
+        # Clip tab at top
+        for x in range(9, 15):
+            img.put(cd, (x, 1))
+            img.put(cd, (x, 2))
+            img.put(cd, (x, 3))
+            img.put(cd, (x, 4))
+        for x in range(7, 17):
+            img.put(cd, (x, 4))
+            img.put(cd, (x, 5))
+        # Lines on board
+        for x in range(7, 17):
+            img.put("#fff0cc", (x, 10))
+            img.put("#fff0cc", (x, 13))
+            img.put("#fff0cc", (x, 16))
+            img.put("#fff0cc", (x, 19))
+        self.icons["paste"] = img
+
+    def _push_undo(self):
+        """Snapshot current state onto undo stack before a mutation."""
+        if self._restoring:
+            return
+        # Flush any pending debounced property undo first
+        if self._prop_pre_snapshot is not None:
+            if self._prop_undo_timer is not None:
+                self.root.after_cancel(self._prop_undo_timer)
+                self._prop_undo_timer = None
+            self._commit_prop_undo()
+        self.undo_stack.append((copy.deepcopy(self.data), self.active_layer_idx))
+        if len(self.undo_stack) > 50:
+            self.undo_stack.pop(0)
+        self.redo_stack.clear()
+        self._update_undo_menu_state()
+
+    def _undo(self):
+        """Restore previous state from the undo stack."""
+        # Flush any pending debounced property undo first
+        if self._prop_pre_snapshot is not None:
+            if self._prop_undo_timer is not None:
+                self.root.after_cancel(self._prop_undo_timer)
+                self._prop_undo_timer = None
+            self._commit_prop_undo()
+        if not self.undo_stack:
+            return
+        self.redo_stack.append((copy.deepcopy(self.data), self.active_layer_idx))
+        data_snapshot, layer_idx = self.undo_stack.pop()
+        self._restore_snapshot(data_snapshot, layer_idx)
+
+    def _redo(self):
+        """Restore next state from the redo stack."""
+        if not self.redo_stack:
+            return
+        self.undo_stack.append((copy.deepcopy(self.data), self.active_layer_idx))
+        data_snapshot, layer_idx = self.redo_stack.pop()
+        self._restore_snapshot(data_snapshot, layer_idx)
+
+    def _restore_snapshot(self, data, layer_idx):
+        """Replace current data with a snapshot and refresh all UI."""
+        self._restoring = True
+        self.data = data
+        self.active_layer_idx = min(layer_idx, max(0, len(self.data["layers"]) - 1))
+        self.name_var.set(self.data.get("name", ""))
+        try:
+            self.width_var.set(self.data.get("width", 1024))
+            self.height_var.set(self.data.get("height", 1024))
+        except tk.TclError:
+            pass
+        self._restoring = False
+        self.selected_items = []
+        self._update_selection_panel()
+        self.dirty = True
+        self._refresh_layer_list()
+        self._redraw_canvas()
+        self._update_undo_menu_state()
+
+    def _update_undo_menu_state(self):
+        """Enable/disable undo/redo in Edit menu and toolbar."""
+        has_undo = bool(self.undo_stack)
+        has_redo = bool(self.redo_stack)
+        self.editmenu.entryconfigure("Undo", state="normal" if has_undo else "disabled")
+        self.editmenu.entryconfigure("Redo", state="normal" if has_redo else "disabled")
+        self.undo_btn.configure(state="normal" if has_undo else "disabled")
+        self.redo_btn.configure(state="normal" if has_redo else "disabled")
+
+    def _clear_undo_stacks(self):
+        """Reset undo/redo history (called on new/open)."""
+        self.undo_stack.clear()
+        self.redo_stack.clear()
+        self._prop_pre_snapshot = None
+        if self._prop_undo_timer is not None:
+            self.root.after_cancel(self._prop_undo_timer)
+            self._prop_undo_timer = None
+        self._update_undo_menu_state()
 
     # -----------------------------------------------------------------
     # Close handler
@@ -2003,10 +2341,13 @@ class MapEditor:
         self.filepath = None
         self.active_layer_idx = 0
         self.dirty = False
+        self._clear_undo_stacks()
         self._clear_selection()
+        self._restoring = True
         self.name_var.set(self.data["name"])
         self.width_var.set(self.data["width"])
         self.height_var.set(self.data["height"])
+        self._restoring = False
         self._refresh_layer_list()
         self._redraw_canvas()
 
@@ -2039,10 +2380,13 @@ class MapEditor:
         self.filepath = path
         self.active_layer_idx = 0
         self.dirty = False
+        self._clear_undo_stacks()
         self._clear_selection()
+        self._restoring = True
         self.name_var.set(self.data.get("name", "Unnamed"))
         self.width_var.set(self.data.get("width", 1024))
         self.height_var.set(self.data.get("height", 1024))
+        self._restoring = False
         self._refresh_layer_list()
         self._redraw_canvas()
         self.root.title(f"Map Editor — {os.path.basename(path)}")
