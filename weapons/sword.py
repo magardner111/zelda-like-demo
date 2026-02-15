@@ -18,6 +18,8 @@ class Sword:
         self.swing_time = data["swing_time"]
         self.afterimage_time = data["afterimage_time"]
         self.damage = data.get("damage", 1)
+        self.knockback = data.get("knockback", 0)
+        self.sneak_bonus = data.get("sneak_bonus", 0)
         self.stamina_cost = data.get("stamina_cost", 0)
 
         # --- Runtime ---
@@ -47,6 +49,7 @@ class Sword:
         self.active = True
         self.timer = self.swing_time
         self.hit_this_swing = False
+        self.sneaking_at_start = self.owner.sneaking
 
         # Play random attack sound if provided
         if self.attack_sounds:
@@ -84,13 +87,20 @@ class Sword:
         if not self.hit_this_swing:
             for enemy in enemies:
                 if self._tip_hits_enemy(tip, enemy):
-                    enemy.take_damage(self.damage, self.owner.pos)
+                    damage = self.damage
+                    if self.sneak_bonus and self.sneaking_at_start and enemy.phase != "alerted":
+                        damage += self.sneak_bonus
+                        self.owner.sneak_attack_timer = self.owner.sneak_attack_duration
+                        self._alert_nearby_enemies(enemies)
+                    enemy.take_damage(damage, self.owner.pos, self.knockback)
                     self.hit_this_swing = True
                     break
 
         # End swing
         if self.timer <= 0:
             self.active = False
+            if self.sneaking_at_start and not self.hit_this_swing:
+                self._alert_nearby_enemies(enemies)
             self.afterimages.clear()
 
         # Update afterimages
@@ -102,6 +112,20 @@ class Sword:
     # =====================================================
     # COLLISION
     # =====================================================
+
+    def _alert_nearby_enemies(self, enemies):
+        """Alert enemies within their alert radius to face the player."""
+        for enemy in enemies:
+            if enemy.current_layer != self.owner.current_layer:
+                continue
+            dist_sq = (enemy.pos - self.owner.pos).length_squared()
+            if dist_sq <= enemy.alert_radius ** 2:
+                enemy.phase = "alerted"
+                enemy.alert_timer = enemy.alert_cooldown
+                enemy._last_known_player_pos = pygame.Vector2(self.owner.pos)
+                direction = self.owner.pos - enemy.pos
+                if direction.length_squared() > 0:
+                    enemy.facing = direction.normalize()
 
     def _tip_hits_enemy(self, tip, enemy):
         """

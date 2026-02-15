@@ -9,6 +9,9 @@ import sys
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
+from data.enemy_stats import ENEMY_STATS
+from data.pattern_registry import PATTERN_REGISTRY
+
 # ---------------------------------------------------------------------------
 # Default data model
 # ---------------------------------------------------------------------------
@@ -25,6 +28,7 @@ def new_map_data():
                 "floor_regions": [],
                 "wall_regions": [],
                 "stairways": [],
+                "enemies": [],
             }
         ],
     }
@@ -47,6 +51,15 @@ REGION_COLORS = {
 }
 
 STAIRWAY_COLOR = (200, 180, 100)
+
+# Enemy rendering
+ALL_ENEMY_TYPES = sorted(ENEMY_STATS.keys())
+ENEMY_DRAW_RADIUS = 12  # map-space radius for rendering/hit-testing
+ALL_PATTERN_TYPES = ["none"] + sorted(PATTERN_REGISTRY.keys())
+ALL_FACING_DIRECTIONS = ["down", "up", "left", "right"]
+FACING_VECTORS = {
+    "down": (0, 1), "up": (0, -1), "left": (-1, 0), "right": (1, 0),
+}
 
 
 def rgb_to_hex(r, g, b):
@@ -71,12 +84,31 @@ def generate_map_code(data):
     if not class_name:
         class_name = "EditorMap"
 
+    # Check if any enemies exist
+    has_enemies = any(layer.get("enemies") for layer in data["layers"])
+
     lines = [
         "from maps.map_base import MapBase",
         "from core.floor_layer import FloorLayer",
         "from core.stairway import Stairway, StairDirection",
         "from core.region_base import WallRegion, FloorRegion, LiquidRegion, ObjectRegion",
         "from data.region_stats import REGION_STATS",
+    ]
+    has_facing = any(
+        e.get("facing", "down") != "down"
+        for layer in data["layers"]
+        for e in layer.get("enemies", [])
+    )
+    if has_enemies:
+        imports = [
+            "from core.enemy_base import Enemy",
+            "from data.enemy_stats import ENEMY_STATS",
+            "from data.pattern_registry import get_pattern_class",
+        ]
+        if has_facing:
+            imports.insert(0, "import pygame")
+        lines += imports
+    lines += [
         "",
         "",
         f"class {class_name}(MapBase):",
@@ -130,6 +162,36 @@ def generate_map_code(data):
             )
         lines.append("")
 
+    # Enemies (gathered from all layers)
+    all_enemies = []
+    for layer in data["layers"]:
+        for e in layer.get("enemies", []):
+            all_enemies.append((layer["elevation"], e))
+    if all_enemies:
+        lines.append("        # --- Enemies ---")
+        for elev, e in all_enemies:
+            etype = e["type"]
+            lines.append(
+                f'        _e = Enemy(({e["x"]}, {e["y"]}), ENEMY_STATS["{etype}"])'
+            )
+            lines.append(f"        _e.current_layer = {elev}")
+            facing = e.get("facing", "down")
+            if facing != "down":
+                facing_map = {"up": "(0, -1)", "left": "(-1, 0)", "right": "(1, 0)"}
+                lines.append(
+                    f"        _e.facing = pygame.Vector2{facing_map[facing]}"
+                )
+            pdata = e.get("pattern")
+            if pdata and pdata.get("type"):
+                ptype = pdata["type"]
+                params = {k: v for k, v in pdata.items() if k != "type"}
+                param_str = ", ".join(f"{k}={v!r}" for k, v in params.items())
+                lines.append(
+                    f'        _e.pattern = get_pattern_class("{ptype}")({param_str})'
+                )
+            lines.append("        self.enemies.append(_e)")
+        lines.append("")
+
     return "\n".join(lines) + "\n"
 
 
@@ -148,8 +210,11 @@ class MapEditor:
         self.data = new_map_data()
         self.filepath = None  # current JSON save path
         self.active_layer_idx = 0
-        self.tool = "select"  # select | wall | floor | stairway
+        self.tool = "select"  # select | wall | floor | stairway | enemy
         self.floor_type = "grass"
+        self.enemy_type = ALL_ENEMY_TYPES[0] if ALL_ENEMY_TYPES else "lvl1enemy"
+        self.enemy_pattern = "none"
+        self.enemy_pattern_params = {}  # current parameter values for placement
 
         # Selection state — list of (kind, index, layer_idx) tuples
         self.selected_items = []
@@ -239,73 +304,131 @@ class MapEditor:
         tk.Button(btn_row, text="Remove", command=self._remove_layer).pack(side=tk.LEFT, expand=True, fill=tk.X)
         tk.Button(btn_row, text="BG Color", command=self._pick_layer_bg).pack(side=tk.LEFT, expand=True, fill=tk.X)
 
-        # Tool selector
-        self.tool_frame = tk.LabelFrame(left, text="Tool", padx=4, pady=4)
-        tool_frame = self.tool_frame
-        tool_frame.pack(fill=tk.X, padx=4, pady=4)
+        # --- Tabbed panel: Tools & Enemies ---
+        self.notebook = ttk.Notebook(left)
+        self.notebook.pack(fill=tk.X, padx=4, pady=4)
+
+        # --- Tools tab ---
+        self.tools_tab = tk.Frame(self.notebook)
+        self.notebook.add(self.tools_tab, text="Tools")
 
         self.tool_var = tk.StringVar(value="select")
-        for t in ("select", "wall", "floor", "stairway"):
-            tk.Radiobutton(tool_frame, text=t.title(), variable=self.tool_var,
+        for t in ("select", "wall", "floor", "stairway", "enemy"):
+            tk.Radiobutton(self.tools_tab, text=t.title(), variable=self.tool_var,
                            value=t, command=self._on_tool_change).pack(anchor="w")
 
         # Floor type dropdown (only visible when floor tool is active)
-        self.ftype_frame = tk.LabelFrame(left, text="Floor Region Type", padx=4, pady=4)
-
+        self.ftype_frame = tk.LabelFrame(self.tools_tab, text="Floor Region Type", padx=4, pady=4)
         self.ftype_var = tk.StringVar(value="grass")
         self.ftype_combo = ttk.Combobox(self.ftype_frame, textvariable=self.ftype_var,
                                         values=ALL_FLOOR_TYPES, state="readonly", width=16)
         self.ftype_combo.pack(fill=tk.X)
         self.ftype_combo.bind("<<ComboboxSelected>>", lambda e: self._on_floor_type_change())
 
-        # Selection properties
-        sel_frame = tk.LabelFrame(left, text="Selection", padx=4, pady=4)
-        sel_frame.pack(fill=tk.X, padx=4, pady=4)
-        self.sel_frame = sel_frame
+        # --- Enemies tab ---
+        self.enemies_tab = tk.Frame(self.notebook)
+        self.notebook.add(self.enemies_tab, text="Enemies")
 
-        self.sel_x_var = tk.IntVar()
-        self.sel_y_var = tk.IntVar()
-        self.sel_w_var = tk.IntVar()
-        self.sel_h_var = tk.IntVar()
+        # Placement section
+        self.placement_frame = tk.LabelFrame(self.enemies_tab, text="Placement", padx=4, pady=4)
+        self.placement_frame.pack(fill=tk.X, padx=4, pady=4)
+        placement_frame = self.placement_frame
 
-        for i, (label, var) in enumerate([("X:", self.sel_x_var), ("Y:", self.sel_y_var),
-                                           ("W:", self.sel_w_var), ("H:", self.sel_h_var)]):
-            tk.Label(sel_frame, text=label).grid(row=i, column=0, sticky="w")
-            e = tk.Entry(sel_frame, textvariable=var, width=10)
-            e.grid(row=i, column=1, sticky="ew")
-            e.bind("<Return>", lambda ev: self._apply_selection_props())
-            e.bind("<FocusOut>", lambda ev: self._apply_selection_props())
+        tk.Label(placement_frame, text="Type:").grid(row=0, column=0, sticky="w")
+        self.etype_var = tk.StringVar(value=self.enemy_type)
+        ttk.Combobox(placement_frame, textvariable=self.etype_var,
+                     values=ALL_ENEMY_TYPES, state="readonly", width=16).grid(row=0, column=1, sticky="ew")
 
-        sel_frame.columnconfigure(1, weight=1)
+        tk.Label(placement_frame, text="Facing:").grid(row=1, column=0, sticky="w")
+        self.efacing_var = tk.StringVar(value="down")
+        ttk.Combobox(placement_frame, textvariable=self.efacing_var,
+                     values=ALL_FACING_DIRECTIONS, state="readonly", width=16).grid(row=1, column=1, sticky="ew")
 
-        tk.Button(sel_frame, text="Apply", command=self._apply_selection_props).grid(
+        tk.Label(placement_frame, text="Pattern:").grid(row=2, column=0, sticky="w")
+        self.epattern_var = tk.StringVar(value="none")
+        self.epattern_combo = ttk.Combobox(placement_frame, textvariable=self.epattern_var,
+                                           values=ALL_PATTERN_TYPES, state="readonly", width=16)
+        self.epattern_combo.grid(row=2, column=1, sticky="ew")
+        self.epattern_combo.bind("<<ComboboxSelected>>", lambda e: self._rebuild_enemy_param_fields())
+
+        # Container for dynamic pattern param fields
+        self.eparam_frame = tk.Frame(placement_frame)
+        self.eparam_frame.grid(row=3, column=0, columnspan=2, sticky="ew")
+        self.eparam_widgets = {}  # name -> (label, entry, var)
+
+        placement_frame.columnconfigure(1, weight=1)
+
+        # Selected Enemy section (shown when an enemy is selected on canvas)
+        self.sel_enemy_frame = tk.LabelFrame(self.enemies_tab, text="Selected Enemy", padx=4, pady=4)
+        # Not packed until an enemy is selected
+
+        # Stats display area (read-only)
+        self.enemy_stats_frame = tk.Frame(self.sel_enemy_frame)
+        self.enemy_stats_frame.pack(fill=tk.X)
+        self.enemy_stats_labels = {}
+
+        ttk.Separator(self.sel_enemy_frame, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=4)
+
+        # Editable fields
+        edit_frame = tk.Frame(self.sel_enemy_frame)
+        edit_frame.pack(fill=tk.X)
+
+        tk.Label(edit_frame, text="Type:").grid(row=0, column=0, sticky="w")
+        self.eprop_type_var = tk.StringVar()
+        self.eprop_type_combo = ttk.Combobox(edit_frame, textvariable=self.eprop_type_var,
+                     values=ALL_ENEMY_TYPES, state="readonly", width=16)
+        self.eprop_type_combo.grid(row=0, column=1, sticky="ew")
+        self.eprop_type_combo.bind("<<ComboboxSelected>>",
+                                    lambda e: self._on_sel_enemy_type_change())
+
+        tk.Label(edit_frame, text="Facing:").grid(row=1, column=0, sticky="w")
+        self.eprop_facing_var = tk.StringVar(value="down")
+        self.eprop_facing_combo = ttk.Combobox(edit_frame, textvariable=self.eprop_facing_var,
+                     values=ALL_FACING_DIRECTIONS, state="readonly", width=16)
+        self.eprop_facing_combo.grid(row=1, column=1, sticky="ew")
+        self.eprop_facing_combo.bind("<<ComboboxSelected>>",
+                                      lambda e: self._on_sel_enemy_facing_change())
+
+        tk.Label(edit_frame, text="Pattern:").grid(row=2, column=0, sticky="w")
+        self.eprop_pattern_var = tk.StringVar(value="none")
+        self.eprop_pattern_combo = ttk.Combobox(edit_frame, textvariable=self.eprop_pattern_var,
+                                                values=ALL_PATTERN_TYPES, state="readonly", width=16)
+        self.eprop_pattern_combo.grid(row=2, column=1, sticky="ew")
+        self.eprop_pattern_combo.bind("<<ComboboxSelected>>",
+                                      lambda e: self._rebuild_enemy_prop_param_fields())
+
+        # Container for dynamic pattern param fields in properties
+        self.eprop_param_frame = tk.Frame(edit_frame)
+        self.eprop_param_frame.grid(row=3, column=0, columnspan=2, sticky="ew")
+        self.eprop_param_widgets = {}
+
+        tk.Button(edit_frame, text="Apply", command=self._apply_enemy_props).grid(
             row=4, column=0, columnspan=2, sticky="ew", pady=(4, 0))
-        tk.Button(sel_frame, text="Delete", command=self._delete_selected).grid(
-            row=5, column=0, columnspan=2, sticky="ew", pady=(2, 0))
 
-        # Stairway properties (shown when stairway selected)
-        stair_frame = tk.LabelFrame(left, text="Stairway Properties", padx=4, pady=4)
-        stair_frame.pack(fill=tk.X, padx=4, pady=4)
-        self.stair_frame = stair_frame
+        edit_frame.columnconfigure(1, weight=1)
 
-        tk.Label(stair_frame, text="From Layer:").grid(row=0, column=0, sticky="w")
+        # Stairway properties (inside tools tab, shown when stairway selected)
+        self.stair_frame = tk.LabelFrame(self.tools_tab, text="Stairway Properties", padx=4, pady=4)
+        # Not packed until a stairway is selected
+
+        tk.Label(self.stair_frame, text="From Layer:").grid(row=0, column=0, sticky="w")
         self.stair_from_var = tk.IntVar()
-        tk.Entry(stair_frame, textvariable=self.stair_from_var, width=6).grid(row=0, column=1, sticky="ew")
+        tk.Entry(self.stair_frame, textvariable=self.stair_from_var, width=6).grid(row=0, column=1, sticky="ew")
 
-        tk.Label(stair_frame, text="To Layer:").grid(row=1, column=0, sticky="w")
+        tk.Label(self.stair_frame, text="To Layer:").grid(row=1, column=0, sticky="w")
         self.stair_to_var = tk.IntVar()
-        tk.Entry(stair_frame, textvariable=self.stair_to_var, width=6).grid(row=1, column=1, sticky="ew")
+        tk.Entry(self.stair_frame, textvariable=self.stair_to_var, width=6).grid(row=1, column=1, sticky="ew")
 
-        tk.Label(stair_frame, text="Direction:").grid(row=2, column=0, sticky="w")
+        tk.Label(self.stair_frame, text="Direction:").grid(row=2, column=0, sticky="w")
         self.stair_dir_var = tk.StringVar(value="left")
-        ttk.Combobox(stair_frame, textvariable=self.stair_dir_var,
+        ttk.Combobox(self.stair_frame, textvariable=self.stair_dir_var,
                      values=["left", "right", "up", "down"], state="readonly",
                      width=8).grid(row=2, column=1, sticky="ew")
 
-        tk.Button(stair_frame, text="Apply", command=self._apply_stairway_props).grid(
+        tk.Button(self.stair_frame, text="Apply", command=self._apply_stairway_props).grid(
             row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
 
-        stair_frame.columnconfigure(1, weight=1)
+        self.stair_frame.columnconfigure(1, weight=1)
 
         # Test button
         tk.Button(left, text="Test Map", command=self._test_map,
@@ -340,6 +463,7 @@ class MapEditor:
         self.root.bind("w", lambda e: self._set_tool("wall"))
         self.root.bind("f", lambda e: self._set_tool("floor"))
         self.root.bind("t", lambda e: self._set_tool("stairway"))
+        self.root.bind("e", lambda e: self._set_tool("enemy"))
         self.root.bind("<Delete>", lambda e: self._delete_selected())
         self.root.bind("<Control-c>", lambda e: self._copy_selected())
         self.root.bind("<Control-x>", lambda e: self._cut_selected())
@@ -444,6 +568,23 @@ class MapEditor:
                     label = f"S {sw['from_layer']}->{sw['to_layer']}"
                     c.create_text(cx, cy, text=label, fill="#333333", font=("sans-serif", 7))
 
+            # Enemies (only on active layer)
+            if is_active:
+                for ei, en in enumerate(layer.get("enemies", [])):
+                    ecx, ecy = self._map_to_screen(en["x"], en["y"])
+                    r = ENEMY_DRAW_RADIUS * self.zoom
+                    ecolor = ENEMY_STATS.get(en["type"], {}).get("color", (200, 40, 40))
+                    c.create_oval(ecx - r, ecy - r, ecx + r, ecy + r,
+                                  fill=rgb_to_hex(*ecolor), outline="#ffffff", width=1)
+                    c.create_text(ecx, ecy, text=en["type"], fill="white",
+                                  font=("sans-serif", 7))
+                    # Facing direction indicator
+                    fdx, fdy = self._get_enemy_facing(en)
+                    esize = ENEMY_STATS.get(en["type"], {}).get("size", 20)
+                    line_len = esize * self.zoom
+                    c.create_line(ecx, ecy, ecx + fdx * line_len, ecy + fdy * line_len,
+                                  fill="#ff0000", width=2)
+
         # Map border
         c.create_rectangle(x0, y0, x1, y1, outline="#aaaaaa", width=2)
 
@@ -453,28 +594,35 @@ class MapEditor:
             for gx in range(0, mw + 1, grid_step):
                 sx0, sy0 = self._map_to_screen(gx, 0)
                 sx1, sy1 = self._map_to_screen(gx, mh)
-                c.create_line(sx0, sy0, sx1, sy1, fill="#444444", width=1)
+                c.create_line(sx0, sy0, sx1, sy1, fill="#444444", width=1, stipple="gray50")
             for gy in range(0, mh + 1, grid_step):
                 sx0, sy0 = self._map_to_screen(0, gy)
                 sx1, sy1 = self._map_to_screen(mw, gy)
-                c.create_line(sx0, sy0, sx1, sy1, fill="#444444", width=1)
+                c.create_line(sx0, sy0, sx1, sy1, fill="#444444", width=1, stipple="gray50")
 
         # Draw selection highlight for all selected items
         for si, (s_kind, s_idx, s_layer_idx) in enumerate(self.selected_items):
-            s_rect = self._get_rect_for_item(s_kind, s_idx, s_layer_idx)
-            if not s_rect:
+            s_item = self._get_rect_for_item(s_kind, s_idx, s_layer_idx)
+            if not s_item:
                 continue
-            rx0, ry0 = self._map_to_screen(s_rect["x"], s_rect["y"])
-            rx1, ry1 = self._map_to_screen(s_rect["x"] + s_rect["w"],
-                                            s_rect["y"] + s_rect["h"])
-            c.create_rectangle(rx0, ry0, rx1, ry1, outline="#ffff00", width=2, dash=(4, 4))
-            # Resize handles only on first selected item
-            if si == 0:
-                hs = self.HANDLE_SIZE
-                handles = self._get_handle_positions(s_rect)
-                for hx, hy in handles.values():
-                    c.create_rectangle(hx - hs, hy - hs, hx + hs, hy + hs,
-                                       fill="#ffff00", outline="#000000")
+            if s_kind == "enemy":
+                # Circle highlight for enemies
+                ecx, ecy = self._map_to_screen(s_item["x"], s_item["y"])
+                r = (ENEMY_DRAW_RADIUS + 4) * self.zoom
+                c.create_oval(ecx - r, ecy - r, ecx + r, ecy + r,
+                              outline="#ffff00", width=2, dash=(4, 4))
+            else:
+                rx0, ry0 = self._map_to_screen(s_item["x"], s_item["y"])
+                rx1, ry1 = self._map_to_screen(s_item["x"] + s_item["w"],
+                                                s_item["y"] + s_item["h"])
+                c.create_rectangle(rx0, ry0, rx1, ry1, outline="#ffff00", width=2, dash=(4, 4))
+                # Resize handles only on first selected item (not for enemies)
+                if si == 0:
+                    hs = self.HANDLE_SIZE
+                    handles = self._get_handle_positions(s_item)
+                    for hx, hy in handles.values():
+                        c.create_rectangle(hx - hs, hy - hs, hx + hs, hy + hs,
+                                           fill="#ffff00", outline="#000000")
 
         # Draw box-select rubber band
         if self.box_select_rect:
@@ -519,11 +667,13 @@ class MapEditor:
         return None
 
     def _get_rect_for_item(self, kind, index, layer_idx):
-        """Return the region/stairway dict for a given selection tuple, or None."""
+        """Return the region/stairway/enemy dict for a given selection tuple, or None."""
         if layer_idx is None or layer_idx >= len(self.data["layers"]):
             return None
         layer = self.data["layers"][layer_idx]
-        if kind == "stairway":
+        if kind == "enemy":
+            lst = layer.get("enemies", [])
+        elif kind == "stairway":
             lst = layer.get("stairways", [])
         elif kind == "wall":
             lst = layer["wall_regions"]
@@ -540,6 +690,9 @@ class MapEditor:
         kind, index, layer_idx = self.selected_items[0]
         return self._get_rect_for_item(kind, index, layer_idx)
 
+    def _is_enemies_tab_active(self):
+        return self.notebook.select() == str(self.enemies_tab)
+
     # -----------------------------------------------------------------
     # Canvas interaction
     # -----------------------------------------------------------------
@@ -549,10 +702,28 @@ class MapEditor:
         self.floor_type = self.ftype_var.get()
         shift_held = event.state & 0x1
 
+        # Enemies tab: click enemy to select, click empty space to place
+        if self._is_enemies_tab_active() and not override_tool:
+            found = self._hit_test_region(mx, my)
+            if found and found[0] == "enemy":
+                self.tool = "select"
+            else:
+                self.tool = "enemy"
+
+        if self.tool == "enemy":
+            # Single click places an enemy at grid-snapped position
+            snap = not shift_held
+            ex = self._snap(mx) if snap else int(mx)
+            ey = self._snap(my) if snap else int(my)
+            self._add_enemy(ex, ey)
+            self._refresh_layer_list()
+            self._redraw_canvas()
+            return
+
         if self.tool == "select":
             # Check if clicking a resize handle on current selection
             sel_rect = self._get_selected_rect()
-            if sel_rect:
+            if sel_rect and self.selected_items[0][0] != "enemy":
                 handle = self._hit_test_handles(event.x, event.y, sel_rect)
                 if handle:
                     self.action = "resize"
@@ -561,6 +732,8 @@ class MapEditor:
 
             # Try to select a region at click point
             found = self._hit_test_region(mx, my)
+            if found and self._is_enemies_tab_active() and found[0] != "enemy":
+                found = None
             if found:
                 kind, idx, layer_idx = found
                 item = (kind, idx, layer_idx)
@@ -603,7 +776,7 @@ class MapEditor:
                 self.box_select_rect = None
                 self._redraw_canvas()
         else:
-            # Drawing tool
+            # Drawing tool (wall/floor/stairway)
             self.action = "draw"
             self.drag_start = (mx, my)
             self.draw_rect = None
@@ -680,6 +853,8 @@ class MapEditor:
             bx, by, bw, bh = self.box_select_rect
             if bw > 2 or bh > 2:
                 found = self._find_regions_in_box(bx, by, bw, bh)
+                if self._is_enemies_tab_active():
+                    found = [f for f in found if f[0] == "enemy"]
                 if shift_held:
                     for item in found:
                         if item in self.selected_items:
@@ -725,10 +900,18 @@ class MapEditor:
 
     def _hit_test_region(self, mx, my):
         """Find region at map coords. Returns (kind, index, layer_idx) or None.
-        Only checks the active layer."""
+        Only checks the active layer. Enemies checked first (they are drawn on top)."""
         al = self.active_layer_idx
         if al < len(self.data["layers"]):
             layer = self.data["layers"][al]
+            # Check enemies first (distance-based, drawn on top)
+            enemies = layer.get("enemies", [])
+            for i in range(len(enemies) - 1, -1, -1):
+                en = enemies[i]
+                dx = mx - en["x"]
+                dy = my - en["y"]
+                if dx * dx + dy * dy <= ENEMY_DRAW_RADIUS * ENEMY_DRAW_RADIUS:
+                    return ("enemy", i, al)
             # Check walls (reverse order so topmost drawn gets priority)
             for i in range(len(layer["wall_regions"]) - 1, -1, -1):
                 wr = layer["wall_regions"][i]
@@ -753,6 +936,9 @@ class MapEditor:
         al = self.active_layer_idx
         if al < len(self.data["layers"]):
             layer = self.data["layers"][al]
+            for i, en in enumerate(layer.get("enemies", [])):
+                if bx <= en["x"] <= bx + bw and by <= en["y"] <= by + bh:
+                    found.append(("enemy", i, al))
             for i, wr in enumerate(layer["wall_regions"]):
                 if self._rects_overlap(bx, by, bw, bh, wr["x"], wr["y"], wr["w"], wr["h"]):
                     found.append(("wall", i, al))
@@ -833,6 +1019,36 @@ class MapEditor:
                 "direction": direction,
             })
 
+    def _add_enemy(self, x, y):
+        if self.active_layer_idx >= len(self.data["layers"]):
+            return
+        layer = self.data["layers"][self.active_layer_idx]
+        etype = self.etype_var.get()
+        ptype = self.epattern_var.get()
+        pattern = None
+        if ptype != "none" and ptype in PATTERN_REGISTRY:
+            defaults = PATTERN_REGISTRY[ptype]["params"]
+            params = dict(defaults)
+            for name, (_, _, var) in self.eparam_widgets.items():
+                try:
+                    params[name] = float(var.get())
+                except (ValueError, tk.TclError):
+                    pass
+            pattern = {"type": ptype}
+            pattern.update(params)
+        facing = self.efacing_var.get()
+        layer.setdefault("enemies", []).append({
+            "type": etype,
+            "x": x,
+            "y": y,
+            "facing": facing,
+            "pattern": pattern,
+        })
+        # Auto-select the new enemy
+        new_idx = len(layer["enemies"]) - 1
+        self.selected_items = [("enemy", new_idx, self.active_layer_idx)]
+        self._update_selection_panel()
+
     # -----------------------------------------------------------------
     # Selection management
     # -----------------------------------------------------------------
@@ -841,34 +1057,36 @@ class MapEditor:
         self._update_selection_panel()
 
     def _update_selection_panel(self):
-        rect = self._get_selected_rect()
-        if rect:
-            self.sel_x_var.set(rect["x"])
-            self.sel_y_var.set(rect["y"])
-            self.sel_w_var.set(rect["w"])
-            self.sel_h_var.set(rect["h"])
-            if self.selected_items and self.selected_items[0][0] == "stairway":
-                self.stair_from_var.set(rect.get("from_layer", 0))
-                self.stair_to_var.set(rect.get("to_layer", 1))
-                self.stair_dir_var.set(rect.get("direction", "left"))
-        else:
-            self.sel_x_var.set(0)
-            self.sel_y_var.set(0)
-            self.sel_w_var.set(0)
-            self.sel_h_var.set(0)
+        item = self._get_selected_rect()
+        is_enemy = self.selected_items and self.selected_items[0][0] == "enemy"
+        is_stairway = self.selected_items and self.selected_items[0][0] == "stairway"
 
-    def _apply_selection_props(self):
-        rect = self._get_selected_rect()
-        if not rect:
-            return
-        try:
-            rect["x"] = self.sel_x_var.get()
-            rect["y"] = self.sel_y_var.get()
-            rect["w"] = self.sel_w_var.get()
-            rect["h"] = self.sel_h_var.get()
-        except tk.TclError:
-            pass
-        self._redraw_canvas()
+        # Enemies tab: toggle placement vs selected enemy
+        if is_enemy and item:
+            self.placement_frame.pack_forget()
+            self.sel_enemy_frame.pack(fill=tk.X, padx=4, pady=4)
+            self.notebook.select(self.enemies_tab)
+            self.eprop_type_var.set(item.get("type", ""))
+            self.eprop_facing_var.set(item.get("facing", "down"))
+            self._refresh_enemy_stats_display(item.get("type", ""))
+            pdata = item.get("pattern")
+            if pdata and pdata.get("type"):
+                self.eprop_pattern_var.set(pdata["type"])
+            else:
+                self.eprop_pattern_var.set("none")
+            self._rebuild_enemy_prop_param_fields()
+        else:
+            self.sel_enemy_frame.pack_forget()
+            self.placement_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        # Tools tab: stairway properties
+        if is_stairway and item:
+            self.stair_frame.pack(fill=tk.X, padx=4, pady=4)
+            self.stair_from_var.set(item.get("from_layer", 0))
+            self.stair_to_var.set(item.get("to_layer", 1))
+            self.stair_dir_var.set(item.get("direction", "left"))
+        else:
+            self.stair_frame.pack_forget()
 
     def _apply_stairway_props(self):
         rect = self._get_selected_rect()
@@ -890,7 +1108,9 @@ class MapEditor:
             if layer_idx is None or layer_idx >= len(self.data["layers"]):
                 continue
             layer = self.data["layers"][layer_idx]
-            if kind == "stairway":
+            if kind == "enemy":
+                lst = layer.get("enemies", [])
+            elif kind == "stairway":
                 lst = layer.get("stairways", [])
             elif kind == "wall":
                 lst = layer["wall_regions"]
@@ -899,6 +1119,7 @@ class MapEditor:
             if idx < len(lst):
                 lst.pop(idx)
         self._clear_selection()
+        self._refresh_layer_list()
         self._redraw_canvas()
 
     def _copy_selected(self):
@@ -934,7 +1155,10 @@ class MapEditor:
             rd = copy.deepcopy(entry["data"])
             rd["x"] += 16
             rd["y"] += 16
-            if kind == "stairway":
+            if kind == "enemy":
+                layer.setdefault("enemies", []).append(rd)
+                new_idx = len(layer["enemies"]) - 1
+            elif kind == "stairway":
                 layer.setdefault("stairways", []).append(rd)
                 new_idx = len(layer["stairways"]) - 1
             elif kind == "wall":
@@ -946,6 +1170,7 @@ class MapEditor:
             new_selection.append((kind, new_idx, al))
         self.selected_items = new_selection
         self._update_selection_panel()
+        self._refresh_layer_list()
         self._redraw_canvas()
 
     # -----------------------------------------------------------------
@@ -958,7 +1183,9 @@ class MapEditor:
             n_floor = len(layer["floor_regions"])
             n_wall = len(layer["wall_regions"])
             n_stair = len(layer.get("stairways", []))
-            self.layer_listbox.insert(tk.END, f"Layer {elev}  (F:{n_floor} W:{n_wall} S:{n_stair})")
+            n_enemy = len(layer.get("enemies", []))
+            label = f"Layer {elev}  (F:{n_floor} W:{n_wall} S:{n_stair} E:{n_enemy})"
+            self.layer_listbox.insert(tk.END, label)
         if self.active_layer_idx < self.layer_listbox.size():
             self.layer_listbox.selection_set(self.active_layer_idx)
 
@@ -978,6 +1205,7 @@ class MapEditor:
             "floor_regions": [],
             "wall_regions": [],
             "stairways": [],
+            "enemies": [],
         })
         self._refresh_layer_list()
         self._redraw_canvas()
@@ -1016,14 +1244,126 @@ class MapEditor:
         self._update_floor_type_visibility()
 
     def _update_floor_type_visibility(self):
-        if self.tool_var.get() == "floor":
-            self.ftype_frame.pack(fill=tk.X, padx=4, pady=4,
-                                  after=self.tool_frame)
+        tool = self.tool_var.get()
+        if tool == "floor":
+            self.ftype_frame.pack(fill=tk.X, padx=4, pady=4)
         else:
             self.ftype_frame.pack_forget()
+        if tool == "enemy":
+            self.notebook.select(self.enemies_tab)
 
     def _on_floor_type_change(self):
         self.floor_type = self.ftype_var.get()
+
+    # -----------------------------------------------------------------
+    # Enemy tool helpers
+    # -----------------------------------------------------------------
+    def _get_enemy_facing(self, enemy_data):
+        """Return (dx, dy) unit vector for the enemy's facing direction."""
+        return FACING_VECTORS.get(enemy_data.get("facing", "down"), (0, 1))
+
+    def _rebuild_enemy_param_fields(self):
+        """Rebuild dynamic pattern parameter fields in the enemy options panel."""
+        for widget in self.eparam_frame.winfo_children():
+            widget.destroy()
+        self.eparam_widgets.clear()
+
+        ptype = self.epattern_var.get()
+        if ptype == "none" or ptype not in PATTERN_REGISTRY:
+            return
+        defaults = PATTERN_REGISTRY[ptype]["params"]
+        for i, (name, default) in enumerate(sorted(defaults.items())):
+            lbl = tk.Label(self.eparam_frame, text=f"{name}:")
+            lbl.grid(row=i, column=0, sticky="w")
+            var = tk.StringVar(value=str(default))
+            ent = tk.Entry(self.eparam_frame, textvariable=var, width=10)
+            ent.grid(row=i, column=1, sticky="ew")
+            self.eparam_widgets[name] = (lbl, ent, var)
+        self.eparam_frame.columnconfigure(1, weight=1)
+
+    def _rebuild_enemy_prop_param_fields(self):
+        """Rebuild dynamic pattern parameter fields in the enemy properties panel."""
+        for widget in self.eprop_param_frame.winfo_children():
+            widget.destroy()
+        self.eprop_param_widgets.clear()
+
+        ptype = self.eprop_pattern_var.get()
+        if ptype == "none" or ptype not in PATTERN_REGISTRY:
+            return
+
+        # Get current values from the selected enemy's pattern data
+        enemy_data = self._get_selected_rect()
+        pdata = enemy_data.get("pattern") if enemy_data else None
+        defaults = PATTERN_REGISTRY[ptype]["params"]
+
+        for i, (name, default) in enumerate(sorted(defaults.items())):
+            lbl = tk.Label(self.eprop_param_frame, text=f"{name}:")
+            lbl.grid(row=i, column=0, sticky="w")
+            # Use existing value from enemy data if available
+            val = default
+            if pdata and name in pdata:
+                val = pdata[name]
+            var = tk.StringVar(value=str(val))
+            ent = tk.Entry(self.eprop_param_frame, textvariable=var, width=10)
+            ent.grid(row=i, column=1, sticky="ew")
+            self.eprop_param_widgets[name] = (lbl, ent, var)
+        self.eprop_param_frame.columnconfigure(1, weight=1)
+
+    def _refresh_enemy_stats_display(self, etype):
+        """Update the read-only stats labels for the selected enemy type."""
+        for widget in self.enemy_stats_frame.winfo_children():
+            widget.destroy()
+        self.enemy_stats_labels.clear()
+        stats = ENEMY_STATS.get(etype, {})
+        for i, (key, val) in enumerate(sorted(stats.items())):
+            tk.Label(self.enemy_stats_frame, text=f"{key}:", anchor="w").grid(
+                row=i, column=0, sticky="w")
+            lbl = tk.Label(self.enemy_stats_frame, text=str(val), anchor="w", fg="#666666")
+            lbl.grid(row=i, column=1, sticky="w", padx=(4, 0))
+            self.enemy_stats_labels[key] = lbl
+        self.enemy_stats_frame.columnconfigure(1, weight=1)
+
+    def _on_sel_enemy_type_change(self):
+        """When the enemy type combo in Selected Enemy changes, update immediately."""
+        enemy = self._get_selected_rect()
+        if enemy:
+            enemy["type"] = self.eprop_type_var.get()
+        self._refresh_enemy_stats_display(self.eprop_type_var.get())
+        self._redraw_canvas()
+
+    def _on_sel_enemy_facing_change(self):
+        """When the facing combo in Selected Enemy changes, update immediately."""
+        enemy = self._get_selected_rect()
+        if enemy:
+            enemy["facing"] = self.eprop_facing_var.get()
+        self._redraw_canvas()
+
+    def _apply_enemy_props(self):
+        """Apply enemy properties panel values to the selected enemy."""
+        if not self.selected_items or self.selected_items[0][0] != "enemy":
+            return
+        enemy = self._get_selected_rect()
+        if not enemy:
+            return
+        enemy["type"] = self.eprop_type_var.get()
+        enemy["facing"] = self.eprop_facing_var.get()
+        ptype = self.eprop_pattern_var.get()
+        if ptype == "none" or ptype not in PATTERN_REGISTRY:
+            enemy["pattern"] = None
+        else:
+            defaults = PATTERN_REGISTRY[ptype]["params"]
+            params = {"type": ptype}
+            for name, default in defaults.items():
+                if name in self.eprop_param_widgets:
+                    _, _, var = self.eprop_param_widgets[name]
+                    try:
+                        params[name] = float(var.get())
+                    except (ValueError, tk.TclError):
+                        params[name] = default
+                else:
+                    params[name] = default
+            enemy["pattern"] = params
+        self._redraw_canvas()
 
     def _on_name_change(self):
         self.data["name"] = self.name_var.get()
@@ -1075,6 +1415,9 @@ class MapEditor:
         else:
             for layer in self.data["layers"]:
                 layer.setdefault("stairways", [])
+        # Ensure enemies list exists on all layers
+        for layer in self.data["layers"]:
+            layer.setdefault("enemies", [])
         self.filepath = path
         self.active_layer_idx = 0
         self._clear_selection()

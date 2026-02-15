@@ -5,5 +5,9 @@ ENEMY_STATS = {
         "max_health": 5,
         "color": (200, 40, 40),
         "hit_damage": 1,
+        "alert_radius": 150,
+        "chase_speed": 100,
+        "knockback_resistance": 0,
+        "alert_cooldown": 3.0,
     }
 }

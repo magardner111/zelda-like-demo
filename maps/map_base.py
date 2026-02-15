@@ -2,11 +2,15 @@ import json
 
 import pygame
 
+from core.collision import resolve_entity_vs_regions
+from core.enemy_base import Enemy
 from core.floor_layer import FloorLayer
 from core.region_base import FloorRegion, LiquidRegion, ObjectRegion, WallRegion
 from core.stairway import Stairway, StairDirection
 from core.region_base import ObjectRegion as _ObjectRegion
 from core.visibility import compute_visibility_polygon, point_in_polygon
+from data.enemy_stats import ENEMY_STATS
+from data.pattern_registry import PATTERN_REGISTRY, get_pattern_class
 from data.region_stats import REGION_STATS
 
 # Region type -> class mapping (matches editor categories)
@@ -67,6 +71,32 @@ class MapBase:
                 )
             )
 
+        # Load enemies
+        for layer_data in data["layers"]:
+            for edata in layer_data.get("enemies", []):
+                etype = edata["type"]
+                stats = ENEMY_STATS.get(etype)
+                if stats is None:
+                    continue
+                enemy = Enemy((edata["x"], edata["y"]), stats)
+                enemy.current_layer = layer_data["elevation"]
+                facing_str = edata.get("facing", "down")
+                facing_map = {"down": (0, 1), "up": (0, -1),
+                              "left": (-1, 0), "right": (1, 0)}
+                fx, fy = facing_map.get(facing_str, (0, 1))
+                enemy.facing = pygame.Vector2(fx, fy)
+                pdata = edata.get("pattern")
+                if pdata and pdata.get("type") in PATTERN_REGISTRY:
+                    pcls = get_pattern_class(pdata["type"])
+                    # Build params: use registry defaults, overridden by JSON values
+                    defaults = PATTERN_REGISTRY[pdata["type"]]["params"]
+                    params = dict(defaults)
+                    for k, v in pdata.items():
+                        if k != "type":
+                            params[k] = v
+                    enemy.pattern = pcls(**params)
+                map_obj.enemies.append(enemy)
+
         return map_obj
 
     def add_layer(self, layer):
@@ -89,7 +119,19 @@ class MapBase:
 
     def update(self, dt, player):
         for enemy in self.enemies:
-            enemy.update(dt, player)
+            layer = self.get_layer(enemy.current_layer)
+            solid_regions = layer.get_solid_regions() if layer else []
+
+            enemy.update(dt, player, solid_regions)
+
+            resolve_entity_vs_regions(enemy, solid_regions)
+
+            self.clamp_entity(enemy)
+
+            self.check_stairway_transitions(enemy)
+
+            self.check_fall(enemy)
+
         self.enemies = [e for e in self.enemies if e.health > 0]
 
     def check_fall(self, entity):

@@ -61,7 +61,18 @@ class Player:
         # Layer
         # -----------------------------
         self.current_layer = 0
+
+        # -----------------------------
+        # Awareness and Visibility
+        # -----------------------------
         self.limit_view = True
+        self.enemy_fade_speed = 255 / .3  # full fade over .3 seconds
+
+        # -----------------------------
+        # Sneak attack text
+        # -----------------------------
+        self.sneak_attack_timer = 0.0
+        self.sneak_attack_duration = 0.5
 
         # -----------------------------
         # Weapons
@@ -92,8 +103,7 @@ class Player:
         attack_active = sword.is_active() if sword else False
         dodging = self.dodge_remaining > 0
 
-        self.sneaking = (not attack_active and not dodging
-                         and input_manager.is_down("sneak"))
+        self.sneaking = (not dodging and input_manager.is_down("sneak"))
 
         if not attack_active and not dodging:
             self._update_facing(input_manager, camera)
@@ -207,6 +217,9 @@ class Player:
         if self.stamina < self.max_stamina:
             self.stamina = min(self.max_stamina, self.stamina + self.stamina_regen * dt)
 
+        if self.sneak_attack_timer > 0:
+            self.sneak_attack_timer -= dt
+
     # =====================================================
     # DRAW
     # =====================================================
@@ -229,6 +242,17 @@ class Player:
         line_start = screen_pos + self.facing * self.facing_line_offset
         line_end = screen_pos + self.facing * (self.facing_line_offset + self.facing_line_length)
         pygame.draw.line(screen, self.facing_line_color, line_start, line_end, 2)
+
+        # Sneak attack text
+        if self.sneak_attack_timer > 0:
+            alpha = int(255 * (self.sneak_attack_timer / self.sneak_attack_duration))
+            font = pygame.font.SysFont("sans-serif", 16, bold=True)
+            text_surf = font.render("Sneak Attack!", True, (0, 255, 0))
+            text_alpha = pygame.Surface(text_surf.get_size(), pygame.SRCALPHA)
+            text_alpha.fill((255, 255, 255, alpha))
+            text_surf.blit(text_alpha, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+            text_rect = text_surf.get_rect(centerx=screen_pos.x, bottom=screen_pos.y - self.radius - 8)
+            screen.blit(text_surf, text_rect)
 
         # Draw Sword
         sword = self.weapons.get("sword")

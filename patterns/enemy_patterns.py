@@ -34,6 +34,7 @@ class UpDownPattern(PatternBase):
             self.start_pos = pygame.Vector2(enemy.pos)
 
         if self.state == "moving_up":
+            enemy.facing = pygame.Vector2(0, -1)
             enemy.pos.y -= self.speed * dt
 
             if enemy.pos.y <= self.start_pos.y - self.distance:
@@ -47,6 +48,7 @@ class UpDownPattern(PatternBase):
                 self.state = "moving_down"
 
         elif self.state == "moving_down":
+            enemy.facing = pygame.Vector2(0, 1)
             enemy.pos.y += self.speed * dt
 
             if enemy.pos.y >= self.start_pos.y:
