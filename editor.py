@@ -1595,13 +1595,16 @@ class MapEditor:
             if not photo:
                 continue
             is_selected = filename in self.selected_tiles
-            lbl = tk.Label(self.tile_inner, image=photo, bg="#333333",
-                           highlightthickness=2,
-                           highlightbackground="#ffff00" if is_selected else "#333333",
-                           bd=0, cursor="hand2")
-            lbl.grid(row=row, column=col, padx=2, pady=2)
+            border_color = "#ffff00" if is_selected else "#333333"
+            frame = tk.Frame(self.tile_inner, bg=border_color, bd=0,
+                             highlightthickness=0)
+            frame.grid(row=row, column=col, padx=2, pady=2)
+            lbl = tk.Label(frame, image=photo, bg="#333333", bd=0,
+                           cursor="hand2")
+            lbl.pack(padx=2, pady=2)
             lbl.photo = photo
             lbl.tile_name = filename
+            frame.tile_name = filename
             lbl.bind("<Button-1>",
                      lambda e, fn=filename, rt=region_type:
                      self._on_tile_select(fn, rt, shift=bool(e.state & 0x1)))
@@ -1626,11 +1629,11 @@ class MapEditor:
                 self.selected_tile_type = region_type
         # Update highlights
         for widget in self.tile_inner.winfo_children():
-            if isinstance(widget, tk.Label) and hasattr(widget, 'tile_name'):
+            if isinstance(widget, tk.Frame) and hasattr(widget, 'tile_name'):
                 if widget.tile_name in self.selected_tiles:
-                    widget.configure(highlightbackground="#ffff00")
+                    widget.configure(bg="#ffff00")
                 else:
-                    widget.configure(highlightbackground="#333333")
+                    widget.configure(bg="#333333")
 
     def _on_right_click(self, event):
         """Right-click: fill region with tiles if selected, otherwise select."""
