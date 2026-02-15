@@ -4,6 +4,7 @@
 import copy
 import json
 import os
+import random
 import subprocess
 import sys
 import tkinter as tk
@@ -222,6 +223,12 @@ class MapEditor:
         self.enemy_pattern = "none"
         self.enemy_pattern_params = {}  # current parameter values for placement
 
+        # Tile state
+        self.selected_tiles = []        # list of selected tile filenames
+        self.selected_tile_type = None  # region type the tiles belong to
+        self.tile_photos = {}           # cache: filepath -> PhotoImage
+        self._scaled_tile_cache = {}    # cache: (filepath, size) -> scaled PhotoImage
+
         # Selection state — list of (kind, index, layer_idx) tuples
         self.selected_items = []
         self.clipboard = []  # for copy/paste
@@ -330,6 +337,30 @@ class MapEditor:
                                         values=ALL_FLOOR_TYPES, state="readonly", width=16)
         self.ftype_combo.pack(fill=tk.X)
         self.ftype_combo.bind("<<ComboboxSelected>>", lambda e: self._on_floor_type_change())
+
+        # Tile picker (shown when wall/floor tool is active)
+        self.tile_picker_frame = tk.LabelFrame(self.tools_tab, text="Tiles", padx=4, pady=4)
+        tile_scroll_ct = tk.Frame(self.tile_picker_frame)
+        tile_scroll_ct.pack(fill=tk.BOTH, expand=True)
+        self.tile_picker_canvas = tk.Canvas(tile_scroll_ct, height=160,
+                                             bg="#333333", highlightthickness=0)
+        self.tile_scroll = ttk.Scrollbar(tile_scroll_ct, orient=tk.VERTICAL,
+                                          command=self.tile_picker_canvas.yview)
+        self.tile_picker_canvas.configure(yscrollcommand=self.tile_scroll.set)
+        self.tile_picker_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.tile_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tile_inner = tk.Frame(self.tile_picker_canvas, bg="#333333")
+        self.tile_picker_canvas.create_window((0, 0), window=self.tile_inner, anchor="nw")
+        self.tile_inner.bind("<Configure>",
+            lambda e: self.tile_picker_canvas.configure(
+                scrollregion=self.tile_picker_canvas.bbox("all")))
+        self.tile_picker_canvas.bind("<Button-4>",
+            lambda e: self.tile_picker_canvas.yview_scroll(-1, "units"))
+        self.tile_picker_canvas.bind("<Button-5>",
+            lambda e: self.tile_picker_canvas.yview_scroll(1, "units"))
+        self.tile_picker_canvas.bind("<MouseWheel>",
+            lambda e: self.tile_picker_canvas.yview_scroll(
+                -1 * (e.delta // 120), "units"))
 
         # --- Enemies tab ---
         self.enemies_tab = tk.Frame(self.notebook)
@@ -455,7 +486,7 @@ class MapEditor:
         self.canvas.bind("<B2-Motion>", self._on_pan_drag)
         self.canvas.bind("<ButtonRelease-2>", self._on_pan_release)
         # Right-click always acts as select
-        self.canvas.bind("<ButtonPress-3>", lambda e: self._on_canvas_press(e, override_tool="select"))
+        self.canvas.bind("<ButtonPress-3>", self._on_right_click)
         self.canvas.bind("<B3-Motion>", self._on_canvas_drag)
         self.canvas.bind("<ButtonRelease-3>", self._on_canvas_release)
         self.canvas.bind("<MouseWheel>", self._on_scroll)
@@ -548,7 +579,9 @@ class MapEditor:
                     color = self._tint_for_layer(REGION_COLORS.get(fr["type"], (100, 100, 100)), li)
                 c.create_rectangle(rx0, ry0, rx1, ry1, fill=color, outline=outline_color,
                                    width=1, stipple=stipple)
-                if is_active:
+                if is_active and fr.get("tiles"):
+                    self._draw_tiles_on_region(fr, fr["type"])
+                elif is_active:
                     # Label
                     cx, cy = (rx0 + rx1) / 2, (ry0 + ry1) / 2
                     c.create_text(cx, cy, text=fr["type"], fill="white",
@@ -564,6 +597,8 @@ class MapEditor:
                     color = self._tint_for_layer(REGION_COLORS["wall"], li)
                 c.create_rectangle(rx0, ry0, rx1, ry1, fill=color, outline=outline_color,
                                    width=1, stipple=stipple)
+                if is_active and wr.get("tiles"):
+                    self._draw_tiles_on_region(wr, "wall")
 
             # Stairways (only on active layer)
             if is_active:
@@ -709,6 +744,23 @@ class MapEditor:
         self.tool = override_tool or self.tool_var.get()
         self.floor_type = self.ftype_var.get()
         shift_held = event.state & 0x1
+
+        # Tile place: left-click places a single tile in a region
+        if self.selected_tiles and self.tool in ("wall", "floor") and not override_tool:
+            found = self._hit_test_region(mx, my)
+            if found:
+                kind, idx, layer_idx = found
+                region = self._get_rect_for_item(kind, idx, layer_idx)
+                if region and self._region_type_matches_tile(kind, region):
+                    snap = not shift_held
+                    tx = self._snap(mx) if snap else int(mx)
+                    ty = self._snap(my) if snap else int(my)
+                    if (region["x"] <= tx < region["x"] + region["w"]
+                            and region["y"] <= ty < region["y"] + region["h"]):
+                        tile = random.choice(self.selected_tiles)
+                        region.setdefault("tiles", {})[f"{tx},{ty}"] = tile
+                        self._redraw_canvas()
+                        return
 
         # Enemies tab: click enemy to select, click empty space to place
         if self._is_enemies_tab_active() and not override_tool:
@@ -990,6 +1042,8 @@ class MapEditor:
     def _apply_zoom(self, factor, sx, sy):
         old_zoom = self.zoom
         self.zoom = max(0.05, min(10.0, self.zoom * factor))
+        if self.zoom != old_zoom:
+            self._scaled_tile_cache.clear()
         # Adjust pan so that map point under cursor stays in place
         ratio = self.zoom / old_zoom
         cw = self.canvas.winfo_width()
@@ -1005,13 +1059,19 @@ class MapEditor:
         if self.active_layer_idx >= len(self.data["layers"]):
             return
         layer = self.data["layers"][self.active_layer_idx]
-        layer["wall_regions"].append({"x": x, "y": y, "w": w, "h": h})
+        region = {"x": x, "y": y, "w": w, "h": h}
+        if self.selected_tiles and self.selected_tile_type == "wall":
+            region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
+        layer["wall_regions"].append(region)
 
     def _add_floor_region(self, x, y, w, h, rtype):
         if self.active_layer_idx >= len(self.data["layers"]):
             return
         layer = self.data["layers"][self.active_layer_idx]
-        layer["floor_regions"].append({"type": rtype, "x": x, "y": y, "w": w, "h": h})
+        region = {"type": rtype, "x": x, "y": y, "w": w, "h": h}
+        if self.selected_tiles and self.selected_tile_type == rtype:
+            region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
+        layer["floor_regions"].append(region)
 
     def _add_stairway(self, x, y, w, h):
         if self.active_layer_idx >= len(self.data["layers"]):
@@ -1259,9 +1319,11 @@ class MapEditor:
             self.ftype_frame.pack_forget()
         if tool == "enemy":
             self.notebook.select(self.enemies_tab)
+        self._refresh_tile_picker()
 
     def _on_floor_type_change(self):
         self.floor_type = self.ftype_var.get()
+        self._refresh_tile_picker()
 
     # -----------------------------------------------------------------
     # Enemy tool helpers
@@ -1372,6 +1434,219 @@ class MapEditor:
                     params[name] = default
             enemy["pattern"] = params
         self._redraw_canvas()
+
+    # -----------------------------------------------------------------
+    # Tile helpers
+    # -----------------------------------------------------------------
+    def _get_tile_dir(self, region_type):
+        return os.path.join(os.path.dirname(__file__), "assets", "tiles", region_type)
+
+    def _load_tile_photo(self, filepath):
+        if filepath not in self.tile_photos:
+            try:
+                self.tile_photos[filepath] = tk.PhotoImage(file=filepath)
+            except tk.TclError:
+                return None
+        return self.tile_photos[filepath]
+
+    def _get_scaled_tile(self, filepath, target_size):
+        """Get a tile PhotoImage scaled to target_size pixels."""
+        cache_key = (filepath, target_size)
+        if cache_key not in self._scaled_tile_cache:
+            photo = self._load_tile_photo(filepath)
+            if not photo or photo.width() == 0:
+                return None
+            orig = photo.width()
+            if target_size == orig:
+                self._scaled_tile_cache[cache_key] = photo
+            else:
+                ratio = target_size / orig
+                best_z, best_s, best_err = 1, 1, abs(1.0 - ratio)
+                for s in range(1, 9):
+                    z = max(1, round(s * ratio))
+                    if z > 8:
+                        continue
+                    err = abs(z / s - ratio)
+                    if err < best_err:
+                        best_z, best_s, best_err = z, s, err
+                scaled = photo.zoom(best_z)
+                if best_s > 1:
+                    scaled = scaled.subsample(best_s)
+                self._scaled_tile_cache[cache_key] = scaled
+        return self._scaled_tile_cache[cache_key]
+
+    def _draw_tiles_on_region(self, region, region_type):
+        """Draw tile images on a region from its tiles dict."""
+        tiles = region.get("tiles")
+        if not tiles:
+            return
+        tile_screen_size = max(1, int(32 * self.zoom))
+        if tile_screen_size < 4:
+            return
+        c = self.canvas
+        cw, ch = c.winfo_width(), c.winfo_height()
+        vis_x0, vis_y0 = self._screen_to_map(0, 0)
+        vis_x1, vis_y1 = self._screen_to_map(cw, ch)
+        tile_dir = self._get_tile_dir(region_type)
+        scaled_cache = {}
+        for key, tile_name in tiles.items():
+            tx, ty = map(int, key.split(","))
+            # Viewport culling
+            if tx + 32 < vis_x0 or tx > vis_x1 or ty + 32 < vis_y0 or ty > vis_y1:
+                continue
+            # Region bounds check
+            if not (region["x"] <= tx < region["x"] + region["w"]
+                    and region["y"] <= ty < region["y"] + region["h"]):
+                continue
+            if tile_name not in scaled_cache:
+                tile_path = os.path.join(tile_dir, tile_name)
+                scaled = self._get_scaled_tile(tile_path, tile_screen_size)
+                if not scaled:
+                    continue
+                scaled_cache[tile_name] = scaled
+            sx, sy = self._map_to_screen(tx, ty)
+            c.create_image(sx, sy, image=scaled_cache[tile_name], anchor="nw")
+
+    def _fill_region_tiles(self, region):
+        """Fill all 32x32 grid cells in a region with the selected tiles."""
+        region["tiles"] = self._make_tile_fill(
+            region["x"], region["y"], region["w"], region["h"],
+            self.selected_tiles)
+
+    def _make_tile_fill(self, x, y, w, h, tile_names):
+        """Generate a tiles dict filling the given rectangle.
+
+        When multiple tiles are provided, picks randomly while minimizing
+        adjacent duplicates (avoids same tile left/above).
+        """
+        tiles = {}
+        if not tile_names:
+            return tiles
+        if len(tile_names) == 1:
+            name = tile_names[0]
+            for tx in range(x, x + w, 32):
+                for ty in range(y, y + h, 32):
+                    tiles[f"{tx},{ty}"] = name
+        else:
+            prev_row = {}
+            for ty in range(y, y + h, 32):
+                prev = None
+                for tx in range(x, x + w, 32):
+                    excluded = set()
+                    if prev:
+                        excluded.add(prev)
+                    above = prev_row.get(tx)
+                    if above:
+                        excluded.add(above)
+                    candidates = [t for t in tile_names if t not in excluded]
+                    if not candidates:
+                        candidates = list(tile_names)
+                    choice = random.choice(candidates)
+                    tiles[f"{tx},{ty}"] = choice
+                    prev = choice
+                    prev_row[tx] = choice
+        return tiles
+
+    def _region_type_matches_tile(self, kind, region):
+        """Check if the selected tile type matches the region."""
+        if kind == "wall" and self.selected_tile_type == "wall":
+            return True
+        if kind == "floor" and region.get("type") == self.selected_tile_type:
+            return True
+        return False
+
+    def _refresh_tile_picker(self):
+        """Rebuild the tile picker grid for the current tool/floor type."""
+        for widget in self.tile_inner.winfo_children():
+            widget.destroy()
+
+        tool = self.tool_var.get()
+        if tool == "wall":
+            region_type = "wall"
+        elif tool == "floor":
+            region_type = self.ftype_var.get()
+        else:
+            self.tile_picker_frame.pack_forget()
+            self.selected_tiles = []
+            self.selected_tile_type = None
+            return
+
+        if self.selected_tile_type != region_type:
+            self.selected_tiles = []
+            self.selected_tile_type = None
+
+        tile_dir = self._get_tile_dir(region_type)
+        tiles = []
+        if os.path.isdir(tile_dir):
+            tiles = sorted(f for f in os.listdir(tile_dir)
+                           if f.lower().endswith(('.png', '.gif', '.ppm', '.pgm')))
+
+        self.tile_picker_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        if not tiles:
+            tk.Label(self.tile_inner, text="No tiles found", fg="#888888",
+                     bg="#333333").grid(row=0, column=0, columnspan=3)
+            return
+
+        for i, filename in enumerate(tiles):
+            row, col = divmod(i, 3)
+            filepath = os.path.join(tile_dir, filename)
+            photo = self._load_tile_photo(filepath)
+            if not photo:
+                continue
+            is_selected = filename in self.selected_tiles
+            lbl = tk.Label(self.tile_inner, image=photo, bg="#333333",
+                           highlightthickness=2,
+                           highlightbackground="#ffff00" if is_selected else "#333333",
+                           bd=0, cursor="hand2")
+            lbl.grid(row=row, column=col, padx=2, pady=2)
+            lbl.photo = photo
+            lbl.tile_name = filename
+            lbl.bind("<Button-1>",
+                     lambda e, fn=filename, rt=region_type:
+                     self._on_tile_select(fn, rt, shift=bool(e.state & 0x1)))
+        self.tile_inner.columnconfigure((0, 1, 2), weight=1)
+
+    def _on_tile_select(self, filename, region_type, shift=False):
+        """Handle clicking a tile in the picker. Shift+click for multi-select."""
+        if shift:
+            if filename in self.selected_tiles:
+                self.selected_tiles.remove(filename)
+            else:
+                self.selected_tiles.append(filename)
+                self.selected_tile_type = region_type
+            if not self.selected_tiles:
+                self.selected_tile_type = None
+        else:
+            if self.selected_tiles == [filename] and self.selected_tile_type == region_type:
+                self.selected_tiles = []
+                self.selected_tile_type = None
+            else:
+                self.selected_tiles = [filename]
+                self.selected_tile_type = region_type
+        # Update highlights
+        for widget in self.tile_inner.winfo_children():
+            if isinstance(widget, tk.Label) and hasattr(widget, 'tile_name'):
+                if widget.tile_name in self.selected_tiles:
+                    widget.configure(highlightbackground="#ffff00")
+                else:
+                    widget.configure(highlightbackground="#333333")
+
+    def _on_right_click(self, event):
+        """Right-click: fill region with tiles if selected, otherwise select."""
+        if self.selected_tiles and self.tool_var.get() in ("wall", "floor"):
+            mx, my = self._screen_to_map(event.x, event.y)
+            found = self._hit_test_region(mx, my)
+            if found:
+                kind, idx, layer_idx = found
+                region = self._get_rect_for_item(kind, idx, layer_idx)
+                if region and self._region_type_matches_tile(kind, region):
+                    self._fill_region_tiles(region)
+                    self._redraw_canvas()
+                    return
+            self._on_canvas_press(event, override_tool="select")
+        else:
+            self._on_canvas_press(event, override_tool="select")
 
     def _on_name_change(self):
         self.data["name"] = self.name_var.get()
