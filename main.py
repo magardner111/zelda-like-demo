@@ -1,3 +1,4 @@
+import argparse
 import pygame
 import sys
 
@@ -22,6 +23,11 @@ from data.sword_stats import SWORD_STATS
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--map", type=str, default=None,
+                        help="Map module name to load (e.g. 'editor' for maps/editor_map.py)")
+    args = parser.parse_args()
+
     pygame.init()
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -50,7 +56,23 @@ def main():
     # -----------------------------
     # Load Map
     # -----------------------------
-    current_map = Lvl1Map()
+    if args.map and args.map.endswith(".json"):
+        from maps.map_base import MapBase
+        current_map = MapBase.from_json(args.map)
+    elif args.map:
+        import importlib
+        mod = importlib.import_module(f"maps.{args.map}_map")
+        # Find the map class: first class that is a subclass of MapBase
+        from maps.map_base import MapBase
+        map_cls = None
+        for attr_name in dir(mod):
+            attr = getattr(mod, attr_name)
+            if isinstance(attr, type) and issubclass(attr, MapBase) and attr is not MapBase:
+                map_cls = attr
+                break
+        current_map = map_cls()
+    else:
+        current_map = Lvl1Map()
     camera.set_bounds(current_map.width, current_map.height)
     menu = MainMenu()
     hud = GameHud(player)
@@ -85,10 +107,12 @@ def main():
             menu.update(input_manager)
 
             # Draw game underneath, then HUD, then menu overlay
+            current_map.update_visibility(player)
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera, player.current_layer)
             player.draw(screen, camera)
             current_map.draw_walls(screen, camera, player.current_layer)
+            current_map.draw_visibility(screen, camera, player)
             hud.draw(screen)
             menu.draw(screen)
         else:
@@ -132,16 +156,19 @@ def main():
             # -----------------------------
             # Draw
             # -----------------------------
+            current_map.update_visibility(player)
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera, player.current_layer)
 
-            # Draw enemies on current layer
+            # Draw enemies on current layer (skip those outside visibility)
             for enemy in current_map.enemies:
-                if enemy.current_layer == player.current_layer:
+                if enemy.current_layer == player.current_layer \
+                        and current_map.is_visible(enemy.pos.x, enemy.pos.y):
                     enemy.draw(screen, camera)
 
             player.draw(screen, camera)
             current_map.draw_walls(screen, camera, player.current_layer)
+            current_map.draw_visibility(screen, camera, player)
             hud.draw(screen)
 
         pygame.display.flip()

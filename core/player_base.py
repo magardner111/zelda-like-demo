@@ -61,6 +61,7 @@ class Player:
         # Layer
         # -----------------------------
         self.current_layer = 0
+        self.limit_view = True
 
         # -----------------------------
         # Weapons
