@@ -1929,26 +1929,18 @@ class MapEditor:
             frame.tile_name = filename
             lbl.bind("<Button-1>",
                      lambda e, fn=filename, rt=region_type:
-                     self._on_tile_select(fn, rt, shift=bool(e.state & 0x1)))
+                     self._on_tile_select(fn, rt))
         self.tile_inner.columnconfigure((0, 1, 2), weight=1)
 
-    def _on_tile_select(self, filename, region_type, shift=False):
-        """Handle clicking a tile in the picker. Shift+click for multi-select."""
-        if shift:
-            if filename in self.selected_tiles:
-                self.selected_tiles.remove(filename)
-            else:
-                self.selected_tiles.append(filename)
-                self.selected_tile_type = region_type
+    def _on_tile_select(self, filename, region_type):
+        """Handle clicking a tile in the picker. Toggle selection on/off."""
+        self.selected_tile_type = region_type
+        if filename in self.selected_tiles:
+            self.selected_tiles.remove(filename)
             if not self.selected_tiles:
                 self.selected_tile_type = None
         else:
-            if self.selected_tiles == [filename] and self.selected_tile_type == region_type:
-                self.selected_tiles = []
-                self.selected_tile_type = None
-            else:
-                self.selected_tiles = [filename]
-                self.selected_tile_type = region_type
+            self.selected_tiles.append(filename)
         # Update highlights
         for widget in self.tile_inner.winfo_children():
             if isinstance(widget, tk.Frame) and hasattr(widget, 'tile_name'):
