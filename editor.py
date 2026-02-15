@@ -9,8 +9,14 @@ import sys
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
+import platform
+
 from data.enemy_stats import ENEMY_STATS
 from data.pattern_registry import PATTERN_REGISTRY
+
+IS_MAC = platform.system() == "Darwin"
+MOD_KEY = "Command" if IS_MAC else "Control"
+MOD_LABEL = "Cmd" if IS_MAC else "Ctrl"
 
 # ---------------------------------------------------------------------------
 # Default data model
@@ -248,18 +254,18 @@ class MapEditor:
         # Menu bar
         menubar = tk.Menu(self.root)
         filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="New", command=self._file_new, accelerator="Ctrl+N")
-        filemenu.add_command(label="Open...", command=self._file_open, accelerator="Ctrl+O")
-        filemenu.add_command(label="Save", command=self._file_save, accelerator="Ctrl+S")
+        filemenu.add_command(label="New", command=self._file_new, accelerator=f"{MOD_LABEL}+N")
+        filemenu.add_command(label="Open...", command=self._file_open, accelerator=f"{MOD_LABEL}+O")
+        filemenu.add_command(label="Save", command=self._file_save, accelerator=f"{MOD_LABEL}+S")
         filemenu.add_command(label="Save As...", command=self._file_save_as)
         filemenu.add_separator()
         filemenu.add_command(label="Export Python...", command=self._export_python)
         menubar.add_cascade(label="File", menu=filemenu)
         self.root.config(menu=menubar)
 
-        self.root.bind("<Control-n>", lambda e: self._file_new())
-        self.root.bind("<Control-o>", lambda e: self._file_open())
-        self.root.bind("<Control-s>", lambda e: self._file_save())
+        self.root.bind(f"<{MOD_KEY}-n>", lambda e: self._file_new())
+        self.root.bind(f"<{MOD_KEY}-o>", lambda e: self._file_open())
+        self.root.bind(f"<{MOD_KEY}-s>", lambda e: self._file_save())
 
         # Main pane
         paned = tk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -465,9 +471,11 @@ class MapEditor:
         self.root.bind("t", lambda e: self._set_tool("stairway"))
         self.root.bind("e", lambda e: self._set_tool("enemy"))
         self.root.bind("<Delete>", lambda e: self._delete_selected())
-        self.root.bind("<Control-c>", lambda e: self._copy_selected())
-        self.root.bind("<Control-x>", lambda e: self._cut_selected())
-        self.root.bind("<Control-v>", lambda e: self._paste_clipboard())
+        if IS_MAC:
+            self.root.bind("<BackSpace>", lambda e: self._delete_selected())
+        self.root.bind(f"<{MOD_KEY}-c>", lambda e: self._copy_selected())
+        self.root.bind(f"<{MOD_KEY}-x>", lambda e: self._cut_selected())
+        self.root.bind(f"<{MOD_KEY}-v>", lambda e: self._paste_clipboard())
 
     # -----------------------------------------------------------------
     # Coordinate transforms

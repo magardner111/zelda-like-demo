@@ -13,7 +13,7 @@ from core.collision import (
 from core.input_manager import InputManager
 from core.player_base import Player
 
-from maps import Lvl1Map
+from maps.map_base import MapBase
 from menus import MainMenu
 from hud import GameHud
 
@@ -25,7 +25,7 @@ from data.sword_stats import SWORD_STATS
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", type=str, default=None,
-                        help="Map module name to load (e.g. 'editor' for maps/editor_map.py)")
+                        help="Path to JSON map file (default: maps/lvl1.json)")
     args = parser.parse_args()
 
     pygame.init()
@@ -56,23 +56,12 @@ def main():
     # -----------------------------
     # Load Map
     # -----------------------------
-    if args.map and args.map.endswith(".json"):
-        from maps.map_base import MapBase
-        current_map = MapBase.from_json(args.map)
-    elif args.map:
-        import importlib
-        mod = importlib.import_module(f"maps.{args.map}_map")
-        # Find the map class: first class that is a subclass of MapBase
-        from maps.map_base import MapBase
-        map_cls = None
-        for attr_name in dir(mod):
-            attr = getattr(mod, attr_name)
-            if isinstance(attr, type) and issubclass(attr, MapBase) and attr is not MapBase:
-                map_cls = attr
-                break
-        current_map = map_cls()
+    import os
+    if args.map:
+        map_path = args.map
     else:
-        current_map = Lvl1Map()
+        map_path = os.path.join(os.path.dirname(__file__), "maps", "lvl1.json")
+    current_map = MapBase.from_json(map_path)
     camera.set_bounds(current_map.width, current_map.height)
     menu = MainMenu()
     hud = GameHud(player)
@@ -160,11 +149,15 @@ def main():
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera, player.current_layer)
 
-            # Draw enemies on current layer (skip those outside visibility)
+            # Fade enemy visibility alpha and draw
             for enemy in current_map.enemies:
-                if enemy.current_layer == player.current_layer \
-                        and current_map.is_visible(enemy.pos.x, enemy.pos.y):
-                    enemy.draw(screen, camera)
+                if enemy.current_layer != player.current_layer:
+                    continue
+                if current_map.is_visible(enemy.pos.x, enemy.pos.y):
+                    enemy.visibility_alpha = 255
+                else:
+                    enemy.visibility_alpha = max(0, enemy.visibility_alpha - player.enemy_fade_speed * dt)
+                enemy.draw(screen, camera)
 
             player.draw(screen, camera)
             current_map.draw_walls(screen, camera, player.current_layer)
