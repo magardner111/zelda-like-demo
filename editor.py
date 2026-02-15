@@ -487,6 +487,9 @@ class MapEditor:
         self.canvas.bind("<ButtonRelease-2>", self._on_pan_release)
         # Right-click always acts as select
         self.canvas.bind("<ButtonPress-3>", self._on_right_click)
+        if IS_MAC:
+            self.canvas.bind("<ButtonPress-2>", self._on_right_click)
+            self.canvas.bind("<Control-ButtonPress-1>", self._on_right_click)
         self.canvas.bind("<B3-Motion>", self._on_canvas_drag)
         self.canvas.bind("<ButtonRelease-3>", self._on_canvas_release)
         self.canvas.bind("<MouseWheel>", self._on_scroll)
