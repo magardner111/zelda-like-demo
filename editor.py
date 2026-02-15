@@ -7,6 +7,7 @@ import os
 import random
 import subprocess
 import sys
+import tempfile
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
@@ -251,7 +252,10 @@ class MapEditor:
         self.pan_start = None  # (screen_x, screen_y, pan_x, pan_y)
         self._mac_b2_used_right_click = False
 
+        self.dirty = False
+
         self._build_ui()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._refresh_layer_list()
         self._redraw_canvas()
 
@@ -516,6 +520,23 @@ class MapEditor:
         self.root.bind(f"<{MOD_KEY}-v>", lambda e: self._paste_clipboard())
         self.root.bind("<Escape>", lambda e: self._on_escape())
 
+        # Zoom with +/- keys
+        self.root.bind("<plus>", self._zoom_in_key)
+        self.root.bind("<equal>", self._zoom_in_key)
+        self.root.bind("<minus>", self._zoom_out_key)
+
+        # Ctrl+arrow to pan camera
+        self.root.bind("<Control-Left>", lambda e: self._pan_key(-50, 0))
+        self.root.bind("<Control-Right>", lambda e: self._pan_key(50, 0))
+        self.root.bind("<Control-Up>", lambda e: self._pan_key(0, -50))
+        self.root.bind("<Control-Down>", lambda e: self._pan_key(0, 50))
+
+        # Arrow keys to nudge selected items
+        self.root.bind("<Left>", lambda e: self._nudge_key(e, -1, 0))
+        self.root.bind("<Right>", lambda e: self._nudge_key(e, 1, 0))
+        self.root.bind("<Up>", lambda e: self._nudge_key(e, 0, -1))
+        self.root.bind("<Down>", lambda e: self._nudge_key(e, 0, 1))
+
     # -----------------------------------------------------------------
     # Coordinate transforms
     # -----------------------------------------------------------------
@@ -767,6 +788,7 @@ class MapEditor:
                             and region["y"] <= ty < region["y"] + region["h"]):
                         tile = random.choice(self.selected_tiles)
                         region.setdefault("tiles", {})[f"{tx},{ty}"] = tile
+                        self.dirty = True
                         self._redraw_canvas()
                         return
 
@@ -926,6 +948,12 @@ class MapEditor:
                     self._add_stairway(x, y, w, h)
             self.draw_rect = None
             self._redraw_canvas()
+
+        elif self.action == "move" and self.move_start_mouse:
+            self.dirty = True
+
+        elif self.action == "resize" and self.resize_handle:
+            self.dirty = True
 
         elif self.action == "box_select" and self.box_select_rect:
             bx, by, bw, bh = self.box_select_rect
@@ -1133,6 +1161,7 @@ class MapEditor:
                 region = self._get_rect_for_item(kind, idx, layer_idx)
                 if region and self._region_type_matches_tile(kind, region):
                     self._fill_region_tiles(region)
+                    self.dirty = True
                     self._redraw_canvas()
                     self._mac_b2_used_right_click = True
                     return
@@ -1165,10 +1194,16 @@ class MapEditor:
 
     # Zoom
     def _on_scroll(self, event):
+        if event.state & 0x4:  # Ctrl held — switch layers
+            self._scroll_layer(1 if event.delta > 0 else -1)
+            return
         factor = 1.1 if event.delta > 0 else 1 / 1.1
         self._apply_zoom(factor, event.x, event.y)
 
     def _on_scroll_linux(self, event):
+        if event.state & 0x4:  # Ctrl held — switch layers
+            self._scroll_layer(1 if event.num == 4 else -1)
+            return
         factor = 1.1 if event.num == 4 else 1 / 1.1
         self._apply_zoom(factor, event.x, event.y)
 
@@ -1185,9 +1220,117 @@ class MapEditor:
         self.pan_y = sy - ch / 2 - ratio * (sy - ch / 2 - self.pan_y)
         self._redraw_canvas()
 
+    def _scroll_layer(self, direction):
+        """Switch active layer by direction (+1 or -1), clamped to valid range."""
+        new_idx = self.active_layer_idx + direction
+        new_idx = max(0, min(len(self.data["layers"]) - 1, new_idx))
+        if new_idx != self.active_layer_idx:
+            self.active_layer_idx = new_idx
+            self.layer_listbox.selection_clear(0, tk.END)
+            self.layer_listbox.selection_set(new_idx)
+            self._clear_selection()
+            self._redraw_canvas()
+
+    def _zoom_in_key(self, event):
+        if self._focus_in_entry():
+            return
+        cx = self.canvas.winfo_width() / 2
+        cy = self.canvas.winfo_height() / 2
+        self._apply_zoom(1.1, cx, cy)
+
+    def _zoom_out_key(self, event):
+        if self._focus_in_entry():
+            return
+        cx = self.canvas.winfo_width() / 2
+        cy = self.canvas.winfo_height() / 2
+        self._apply_zoom(1 / 1.1, cx, cy)
+
+    def _pan_key(self, dx, dy):
+        self.pan_x += dx
+        self.pan_y += dy
+        self._redraw_canvas()
+
+    def _nudge_key(self, event, dir_x, dir_y):
+        if self._focus_in_entry():
+            return
+        if not self.selected_items:
+            return
+        shift_held = event.state & 0x1
+        step = 1 if shift_held else 32
+        self._nudge_selected(dir_x * step, dir_y * step)
+
+    def _nudge_selected(self, dx, dy):
+        for s_kind, s_idx, s_layer_idx in self.selected_items:
+            r = self._get_rect_for_item(s_kind, s_idx, s_layer_idx)
+            if not r:
+                continue
+            old_x, old_y = r["x"], r["y"]
+            r["x"] = old_x + dx
+            r["y"] = old_y + dy
+            if r.get("tiles") and (dx != 0 or dy != 0):
+                r["tiles"] = {
+                    f"{int(k.split(',')[0]) + dx},{int(k.split(',')[1]) + dy}": v
+                    for k, v in r["tiles"].items()
+                }
+        self.dirty = True
+        self._update_selection_panel()
+        self._redraw_canvas()
+
+    def _focus_in_entry(self):
+        """Return True if a text entry widget currently has focus."""
+        w = self.root.focus_get()
+        return isinstance(w, (tk.Entry, ttk.Entry, ttk.Combobox))
+
     # -----------------------------------------------------------------
     # Region / stairway creation
     # -----------------------------------------------------------------
+    def _merge_adjacent_regions(self):
+        """Merge same-type adjacent floor regions that share a full edge into one."""
+        if self.active_layer_idx >= len(self.data["layers"]):
+            return
+        layer = self.data["layers"][self.active_layer_idx]
+        regions = layer["floor_regions"]
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(regions)):
+                for j in range(i + 1, len(regions)):
+                    a, b = regions[i], regions[j]
+                    if a["type"] != b["type"]:
+                        continue
+                    merged = None
+                    # Vertical merge: same x and w, one bottom == other top
+                    if a["x"] == b["x"] and a["w"] == b["w"]:
+                        if a["y"] + a["h"] == b["y"]:
+                            merged = {"type": a["type"], "x": a["x"], "y": a["y"],
+                                      "w": a["w"], "h": a["h"] + b["h"]}
+                        elif b["y"] + b["h"] == a["y"]:
+                            merged = {"type": a["type"], "x": a["x"], "y": b["y"],
+                                      "w": a["w"], "h": a["h"] + b["h"]}
+                    # Horizontal merge: same y and h, one right == other left
+                    if merged is None and a["y"] == b["y"] and a["h"] == b["h"]:
+                        if a["x"] + a["w"] == b["x"]:
+                            merged = {"type": a["type"], "x": a["x"], "y": a["y"],
+                                      "w": a["w"] + b["w"], "h": a["h"]}
+                        elif b["x"] + b["w"] == a["x"]:
+                            merged = {"type": a["type"], "x": b["x"], "y": a["y"],
+                                      "w": a["w"] + b["w"], "h": a["h"]}
+                    if merged is not None:
+                        # Combine tiles from both regions
+                        tiles = {}
+                        if a.get("tiles"):
+                            tiles.update(a["tiles"])
+                        if b.get("tiles"):
+                            tiles.update(b["tiles"])
+                        if tiles:
+                            merged["tiles"] = tiles
+                        regions[i] = merged
+                        regions.pop(j)
+                        changed = True
+                        break
+                if changed:
+                    break
+
     def _add_wall_region(self, x, y, w, h):
         if self.active_layer_idx >= len(self.data["layers"]):
             return
@@ -1200,6 +1343,7 @@ class MapEditor:
         if self.selected_tiles and self.selected_tile_type == "wall":
             region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
         layer["wall_regions"].append(region)
+        self.dirty = True
 
     def _add_floor_region(self, x, y, w, h, rtype):
         if self.active_layer_idx >= len(self.data["layers"]):
@@ -1224,6 +1368,8 @@ class MapEditor:
         if self.selected_tiles and self.selected_tile_type == rtype:
             region["tiles"] = self._make_tile_fill(x, y, w, h, self.selected_tiles)
         layer["floor_regions"].append(region)
+        self._merge_adjacent_regions()
+        self.dirty = True
 
     def _add_stairway(self, x, y, w, h):
         if self.active_layer_idx >= len(self.data["layers"]):
@@ -1238,6 +1384,7 @@ class MapEditor:
                 "from_layer": from_l, "to_layer": to_l,
                 "direction": direction,
             })
+            self.dirty = True
 
     def _add_enemy(self, x, y):
         if self.active_layer_idx >= len(self.data["layers"]):
@@ -1264,6 +1411,7 @@ class MapEditor:
             "facing": facing,
             "pattern": pattern,
         })
+        self.dirty = True
         # Auto-select the new enemy
         new_idx = len(layer["enemies"]) - 1
         self.selected_items = [("enemy", new_idx, self.active_layer_idx)]
@@ -1320,6 +1468,7 @@ class MapEditor:
             rect["from_layer"] = self.stair_from_var.get()
             rect["to_layer"] = self.stair_to_var.get()
             rect["direction"] = self.stair_dir_var.get()
+            self.dirty = True
         except tk.TclError:
             pass
         self._redraw_canvas()
@@ -1342,6 +1491,7 @@ class MapEditor:
                 lst = layer["floor_regions"]
             if idx < len(lst):
                 lst.pop(idx)
+        self.dirty = True
         self._clear_selection()
         self._refresh_layer_list()
         self._redraw_canvas()
@@ -1377,8 +1527,18 @@ class MapEditor:
         for entry in self.clipboard:
             kind = entry["kind"]
             rd = copy.deepcopy(entry["data"])
-            rd["x"] += 16
-            rd["y"] += 16
+            # Only offset when pasting within the same layer (avoid exact overlap)
+            same_layer = entry["layer_idx"] == al
+            if same_layer:
+                off = 16
+                rd["x"] += off
+                rd["y"] += off
+                # Shift tile keys by the same offset
+                if rd.get("tiles"):
+                    rd["tiles"] = {
+                        f"{int(k.split(',')[0]) + off},{int(k.split(',')[1]) + off}": v
+                        for k, v in rd["tiles"].items()
+                    }
             if kind == "enemy":
                 layer.setdefault("enemies", []).append(rd)
                 new_idx = len(layer["enemies"]) - 1
@@ -1392,6 +1552,8 @@ class MapEditor:
                 layer["floor_regions"].append(rd)
                 new_idx = len(layer["floor_regions"]) - 1
             new_selection.append((kind, new_idx, al))
+        self._merge_adjacent_regions()
+        self.dirty = True
         self.selected_items = new_selection
         self._update_selection_panel()
         self._refresh_layer_list()
@@ -1431,6 +1593,7 @@ class MapEditor:
             "stairways": [],
             "enemies": [],
         })
+        self.dirty = True
         self._refresh_layer_list()
         self._redraw_canvas()
 
@@ -1441,6 +1604,7 @@ class MapEditor:
         if self.active_layer_idx < len(self.data["layers"]):
             self.data["layers"].pop(self.active_layer_idx)
             self.active_layer_idx = max(0, self.active_layer_idx - 1)
+            self.dirty = True
             self._clear_selection()
             self._refresh_layer_list()
             self._redraw_canvas()
@@ -1453,6 +1617,7 @@ class MapEditor:
         result = colorchooser.askcolor(color=initial, title="Layer Background Color")
         if result and result[1]:
             layer["bg_color"] = list(hex_to_rgb(result[1]))
+            self.dirty = True
             self._redraw_canvas()
 
     # -----------------------------------------------------------------
@@ -1552,6 +1717,7 @@ class MapEditor:
         enemy = self._get_selected_rect()
         if enemy:
             enemy["type"] = self.eprop_type_var.get()
+            self.dirty = True
         self._refresh_enemy_stats_display(self.eprop_type_var.get())
         self._redraw_canvas()
 
@@ -1560,6 +1726,7 @@ class MapEditor:
         enemy = self._get_selected_rect()
         if enemy:
             enemy["facing"] = self.eprop_facing_var.get()
+            self.dirty = True
         self._redraw_canvas()
 
     def _apply_enemy_props(self):
@@ -1587,6 +1754,7 @@ class MapEditor:
                 else:
                     params[name] = default
             enemy["pattern"] = params
+        self.dirty = True
         self._redraw_canvas()
 
     # -----------------------------------------------------------------
@@ -1799,6 +1967,7 @@ class MapEditor:
                 region = self._get_rect_for_item(kind, idx, layer_idx)
                 if region and self._region_type_matches_tile(kind, region):
                     self._fill_region_tiles(region)
+                    self.dirty = True
                     self._redraw_canvas()
                     return
             self._on_canvas_press(event, override_tool="select")
@@ -1807,14 +1976,30 @@ class MapEditor:
 
     def _on_name_change(self):
         self.data["name"] = self.name_var.get()
+        self.dirty = True
 
     def _on_map_size_change(self):
         try:
             self.data["width"] = self.width_var.get()
             self.data["height"] = self.height_var.get()
+            self.dirty = True
             self._redraw_canvas()
         except tk.TclError:
             pass
+
+    # -----------------------------------------------------------------
+    # Close handler
+    # -----------------------------------------------------------------
+    def _on_close(self):
+        if self.dirty:
+            result = messagebox.askyesnocancel(
+                "Unsaved Changes", "Save before closing?")
+            if result is None:  # Cancel
+                return
+            if result:  # Yes
+                self._file_save()
+            # No — fall through to destroy
+        self.root.destroy()
 
     # -----------------------------------------------------------------
     # File operations
@@ -1825,6 +2010,7 @@ class MapEditor:
         self.data = new_map_data()
         self.filepath = None
         self.active_layer_idx = 0
+        self.dirty = False
         self._clear_selection()
         self.name_var.set(self.data["name"])
         self.width_var.set(self.data["width"])
@@ -1860,6 +2046,7 @@ class MapEditor:
             layer.setdefault("enemies", [])
         self.filepath = path
         self.active_layer_idx = 0
+        self.dirty = False
         self._clear_selection()
         self.name_var.set(self.data.get("name", "Unnamed"))
         self.width_var.set(self.data.get("width", 1024))
@@ -1890,6 +2077,7 @@ class MapEditor:
     def _save_to(self, path):
         with open(path, "w") as f:
             json.dump(self.data, f, indent=2)
+        self.dirty = False
 
     def _export_python(self):
         path = filedialog.asksaveasfilename(
@@ -1909,15 +2097,27 @@ class MapEditor:
     # Test button
     # -----------------------------------------------------------------
     def _test_map(self):
-        # Auto-save JSON
-        if not self.filepath:
-            maps_dir = os.path.join(os.path.dirname(__file__), "maps")
-            self.filepath = os.path.join(maps_dir, f"{self.data['name'].lower()}.json")
-        self._save_to(self.filepath)
+        result = messagebox.askyesnocancel(
+            "Test Map", "Would you like to save before testing?")
+        if result is None:  # Cancel
+            return
 
-        # Launch game with JSON path directly
         main_py = os.path.join(os.path.dirname(__file__), "main.py")
-        subprocess.Popen([sys.executable, main_py, "--map", self.filepath])
+
+        if result:  # Yes — Save & Test
+            old_filepath = self.filepath
+            self._file_save()
+            # If user cancelled Save As dialog, filepath stays None — abort
+            if not self.filepath:
+                self.filepath = old_filepath
+                return
+            subprocess.Popen([sys.executable, main_py, "--map", self.filepath])
+        else:  # No — Test Only (temp file)
+            tmp = tempfile.NamedTemporaryFile(
+                suffix=".json", delete=False, mode="w")
+            json.dump(self.data, tmp, indent=2)
+            tmp.close()
+            subprocess.Popen([sys.executable, main_py, "--map", tmp.name])
 
 
 # ---------------------------------------------------------------------------
