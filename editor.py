@@ -2437,6 +2437,14 @@ class MapEditor:
 
     def _file_save(self):
         if self.filepath:
+            if os.path.exists(self.filepath):
+                ok = messagebox.askyesno(
+                    "Overwrite File",
+                    f"'{os.path.basename(self.filepath)}' already exists.\n"
+                    "Do you want to overwrite it?",
+                )
+                if not ok:
+                    return
             self._save_to(self.filepath)
         else:
             self._file_save_as()
