@@ -1,0 +1,1834 @@
+{
+  "name": "RhodeIsland 1234 !23a2309090234~|!@AE!@#$#@%#$%$%^",
+  "width": 900,
+  "height": 1600,
+  "layers": [
+    {
+      "elevation": 0,
+      "bg_color": [
+        72,
+        60,
+        50
+      ],
+      "floor_regions": [
+        {
+          "type": "stone",
+          "x": 384,
+          "y": 0,
+          "w": 96,
+          "h": 928,
+          "tiles": {
+            "384,0": "stone1.png",
+            "416,0": "stone2.png",
+            "448,0": "stone3.png",
+            "384,32": "stone2.png",
+            "416,32": "stone3.png",
+            "448,32": "stone1.png",
+            "384,64": "stone1.png",
+            "416,64": "stone2.png",
+            "448,64": "stone3.png",
+            "384,96": "stone3.png",
+            "416,96": "stone1.png",
+            "448,96": "stone2.png",
+            "384,128": "stone2.png",
+            "416,128": "stone3.png",
+            "448,128": "stone1.png",
+            "384,160": "stone3.png",
+            "416,160": "stone1.png",
+            "448,160": "stone2.png",
+            "384,192": "stone2.png",
+            "416,192": "stone3.png",
+            "448,192": "stone1.png",
+            "384,224": "stone3.png",
+            "416,224": "stone1.png",
+            "448,224": "stone2.png",
+            "384,256": "stone1.png",
+            "416,256": "stone2.png",
+            "448,256": "stone3.png",
+            "384,288": "stone3.png",
+            "416,288": "stone1.png",
+            "448,288": "stone2.png",
+            "384,320": "stone1.png",
+            "416,320": "stone3.png",
+            "448,320": "stone1.png",
+            "384,352": "stone3.png",
+            "416,352": "stone2.png",
+            "448,352": "stone3.png",
+            "384,384": "stone2.png",
+            "416,384": "stone1.png",
+            "448,384": "stone2.png",
+            "384,416": "stone3.png",
+            "416,416": "stone2.png",
+            "448,416": "stone1.png",
+            "384,448": "stone2.png",
+            "416,448": "stone3.png",
+            "448,448": "stone2.png",
+            "384,480": "stone1.png",
+            "416,480": "stone2.png",
+            "448,480": "stone1.png",
+            "384,512": "stone3.png",
+            "416,512": "stone1.png",
+            "448,512": "stone3.png",
+            "384,544": "stone1.png",
+            "416,544": "stone3.png",
+            "448,544": "stone1.png",
+            "384,576": "stone2.png",
+            "416,576": "stone1.png",
+            "448,576": "stone2.png",
+            "384,608": "stone3.png",
+            "416,608": "stone2.png",
+            "448,608": "stone1.png",
+            "384,640": "stone2.png",
+            "416,640": "stone3.png",
+            "448,640": "stone2.png",
+            "384,672": "stone1.png",
+            "416,672": "stone2.png",
+            "448,672": "stone1.png",
+            "384,704": "stone3.png",
+            "416,704": "stone1.png",
+            "448,704": "stone2.png",
+            "384,736": "stone1.png",
+            "416,736": "stone3.png",
+            "448,736": "stone1.png",
+            "384,768": "stone3.png",
+            "416,768": "stone1.png",
+            "448,768": "stone2.png",
+            "384,800": "stone2.png",
+            "416,800": "stone3.png",
+            "448,800": "stone1.png",
+            "384,832": "stone3.png",
+            "416,832": "stone1.png",
+            "448,832": "stone2.png",
+            "384,864": "stone1.png",
+            "416,864": "stone2.png",
+            "448,864": "stone1.png",
+            "384,896": "stone3.png",
+            "416,896": "stone1.png",
+            "448,896": "stone3.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 928,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,928": "stone2.png",
+            "256,928": "stone3.png",
+            "288,928": "stone2.png",
+            "320,928": "stone3.png",
+            "352,928": "stone2.png",
+            "384,928": "stone3.png",
+            "416,928": "stone2.png",
+            "448,928": "stone1.png",
+            "480,928": "stone3.png",
+            "512,928": "stone2.png",
+            "544,928": "stone1.png",
+            "576,928": "stone2.png",
+            "608,928": "stone3.png",
+            "224,960": "stone1.png",
+            "256,960": "stone2.png",
+            "288,960": "stone3.png",
+            "320,960": "stone2.png",
+            "352,960": "stone1.png",
+            "384,960": "stone2.png",
+            "416,960": "stone3.png",
+            "448,960": "stone2.png",
+            "480,960": "stone1.png",
+            "512,960": "stone3.png",
+            "544,960": "stone2.png",
+            "576,960": "stone3.png",
+            "608,960": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 1280,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,1280": "stone3.png",
+            "256,1280": "stone1.png",
+            "288,1280": "stone3.png",
+            "320,1280": "stone1.png",
+            "352,1280": "stone3.png",
+            "384,1280": "stone2.png",
+            "416,1280": "stone3.png",
+            "448,1280": "stone1.png",
+            "480,1280": "stone3.png",
+            "512,1280": "stone1.png",
+            "544,1280": "stone3.png",
+            "576,1280": "stone2.png",
+            "608,1280": "stone3.png",
+            "224,1312": "stone1.png",
+            "256,1312": "stone3.png",
+            "288,1312": "stone1.png",
+            "320,1312": "stone3.png",
+            "352,1312": "stone1.png",
+            "384,1312": "stone3.png",
+            "416,1312": "stone1.png",
+            "448,1312": "stone2.png",
+            "480,1312": "stone1.png",
+            "512,1312": "stone2.png",
+            "544,1312": "stone1.png",
+            "576,1312": "stone3.png",
+            "608,1312": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "224,992": "stone2.png",
+            "256,992": "stone1.png",
+            "224,1024": "stone3.png",
+            "256,1024": "stone2.png",
+            "224,1056": "stone2.png",
+            "256,1056": "stone3.png",
+            "224,1088": "stone1.png",
+            "256,1088": "stone2.png",
+            "224,1120": "stone2.png",
+            "256,1120": "stone1.png",
+            "224,1152": "stone3.png",
+            "256,1152": "stone2.png",
+            "224,1184": "stone2.png",
+            "256,1184": "stone3.png",
+            "224,1216": "stone3.png",
+            "256,1216": "stone2.png",
+            "224,1248": "stone1.png",
+            "256,1248": "stone3.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 576,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "576,992": "stone1.png",
+            "608,992": "stone3.png",
+            "576,1024": "stone2.png",
+            "608,1024": "stone1.png",
+            "576,1056": "stone1.png",
+            "608,1056": "stone3.png",
+            "576,1088": "stone2.png",
+            "608,1088": "stone1.png",
+            "576,1120": "stone3.png",
+            "608,1120": "stone2.png",
+            "576,1152": "stone2.png",
+            "608,1152": "stone3.png",
+            "576,1184": "stone1.png",
+            "608,1184": "stone2.png",
+            "576,1216": "stone2.png",
+            "608,1216": "stone3.png",
+            "576,1248": "stone1.png",
+            "608,1248": "stone2.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 992,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,992": "grass2.png",
+            "320,992": "grass3.png",
+            "352,992": "grass_f3.png",
+            "384,992": "grass1.png",
+            "416,992": "grass3.png",
+            "448,992": "grass_f3.png",
+            "480,992": "grass2.png",
+            "512,992": "grass_f3.png",
+            "544,992": "grass2.png",
+            "288,1024": "grass1.png",
+            "320,1024": "grass_f3.png",
+            "352,1024": "grass3.png",
+            "384,1024": "grass_f1.png",
+            "416,1024": "grass_f3.png",
+            "448,1024": "grass3.png",
+            "480,1024": "grass_f1.png",
+            "512,1024": "grass3.png",
+            "544,1024": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1216,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,1216": "grass1.png",
+            "320,1216": "grass_f3.png",
+            "352,1216": "grass_f1.png",
+            "384,1216": "grass2.png",
+            "416,1216": "grass_f3.png",
+            "448,1216": "grass3.png",
+            "480,1216": "grass2.png",
+            "512,1216": "grass3.png",
+            "544,1216": "grass_f3.png",
+            "288,1248": "grass3.png",
+            "320,1248": "grass2.png",
+            "352,1248": "grass3.png",
+            "384,1248": "grass_f3.png",
+            "416,1248": "grass3.png",
+            "448,1248": "grass_f3.png",
+            "480,1248": "grass3.png",
+            "512,1248": "grass2.png",
+            "544,1248": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "288,1056": "grass3.png",
+            "320,1056": "grass_f1.png",
+            "288,1088": "grass_f3.png",
+            "320,1088": "grass3.png",
+            "288,1120": "grass3.png",
+            "320,1120": "grass_f1.png",
+            "288,1152": "grass_f3.png",
+            "320,1152": "grass3.png",
+            "288,1184": "grass2.png",
+            "320,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 512,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "512,1056": "grass2.png",
+            "544,1056": "grass3.png",
+            "512,1088": "grass_f3.png",
+            "544,1088": "grass1.png",
+            "512,1120": "grass1.png",
+            "544,1120": "grass3.png",
+            "512,1152": "grass_f3.png",
+            "544,1152": "grass2.png",
+            "512,1184": "grass2.png",
+            "544,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "water",
+          "x": 352,
+          "y": 1056,
+          "w": 160,
+          "h": 160
+        }
+      ],
+      "wall_regions": [
+        {
+          "x": 192,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 1376,
+          "w": 416,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 320,
+          "y": 1024,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 512,
+          "y": 1024,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 320,
+          "y": 1216,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 512,
+          "y": 1216,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 928,
+          "w": 64,
+          "h": 32
+        },
+        {
+          "x": 576,
+          "y": 928,
+          "w": 64,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 800,
+          "w": 32,
+          "h": 96
+        },
+        {
+          "x": 352,
+          "y": 800,
+          "w": 32,
+          "h": 96
+        }
+      ],
+      "stairways": [
+        {
+          "x": 224,
+          "y": 1344,
+          "w": 416,
+          "h": 32,
+          "from_layer": 0,
+          "to_layer": 1,
+          "direction": "down"
+        }
+      ],
+      "enemies": []
+    },
+    {
+      "elevation": 1,
+      "bg_color": [
+        90,
+        85,
+        78
+      ],
+      "floor_regions": [
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 928,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,928": "stone2.png",
+            "256,928": "stone3.png",
+            "288,928": "stone2.png",
+            "320,928": "stone3.png",
+            "352,928": "stone2.png",
+            "384,928": "stone3.png",
+            "416,928": "stone2.png",
+            "448,928": "stone1.png",
+            "480,928": "stone3.png",
+            "512,928": "stone2.png",
+            "544,928": "stone1.png",
+            "576,928": "stone2.png",
+            "608,928": "stone3.png",
+            "224,960": "stone1.png",
+            "256,960": "stone2.png",
+            "288,960": "stone3.png",
+            "320,960": "stone2.png",
+            "352,960": "stone1.png",
+            "384,960": "stone2.png",
+            "416,960": "stone3.png",
+            "448,960": "stone2.png",
+            "480,960": "stone1.png",
+            "512,960": "stone3.png",
+            "544,960": "stone2.png",
+            "576,960": "stone3.png",
+            "608,960": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 1280,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,1280": "stone3.png",
+            "256,1280": "stone1.png",
+            "288,1280": "stone3.png",
+            "320,1280": "stone1.png",
+            "352,1280": "stone3.png",
+            "384,1280": "stone2.png",
+            "416,1280": "stone3.png",
+            "448,1280": "stone1.png",
+            "480,1280": "stone3.png",
+            "512,1280": "stone1.png",
+            "544,1280": "stone3.png",
+            "576,1280": "stone2.png",
+            "608,1280": "stone3.png",
+            "224,1312": "stone1.png",
+            "256,1312": "stone3.png",
+            "288,1312": "stone1.png",
+            "320,1312": "stone3.png",
+            "352,1312": "stone1.png",
+            "384,1312": "stone3.png",
+            "416,1312": "stone1.png",
+            "448,1312": "stone2.png",
+            "480,1312": "stone1.png",
+            "512,1312": "stone2.png",
+            "544,1312": "stone1.png",
+            "576,1312": "stone3.png",
+            "608,1312": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "224,992": "stone2.png",
+            "256,992": "stone1.png",
+            "224,1024": "stone3.png",
+            "256,1024": "stone2.png",
+            "224,1056": "stone2.png",
+            "256,1056": "stone3.png",
+            "224,1088": "stone1.png",
+            "256,1088": "stone2.png",
+            "224,1120": "stone2.png",
+            "256,1120": "stone1.png",
+            "224,1152": "stone3.png",
+            "256,1152": "stone2.png",
+            "224,1184": "stone2.png",
+            "256,1184": "stone3.png",
+            "224,1216": "stone3.png",
+            "256,1216": "stone2.png",
+            "224,1248": "stone1.png",
+            "256,1248": "stone3.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 576,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "576,992": "stone1.png",
+            "608,992": "stone3.png",
+            "576,1024": "stone2.png",
+            "608,1024": "stone1.png",
+            "576,1056": "stone1.png",
+            "608,1056": "stone3.png",
+            "576,1088": "stone2.png",
+            "608,1088": "stone1.png",
+            "576,1120": "stone3.png",
+            "608,1120": "stone2.png",
+            "576,1152": "stone2.png",
+            "608,1152": "stone3.png",
+            "576,1184": "stone1.png",
+            "608,1184": "stone2.png",
+            "576,1216": "stone2.png",
+            "608,1216": "stone3.png",
+            "576,1248": "stone1.png",
+            "608,1248": "stone2.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 992,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,992": "grass2.png",
+            "320,992": "grass3.png",
+            "352,992": "grass_f3.png",
+            "384,992": "grass1.png",
+            "416,992": "grass3.png",
+            "448,992": "grass_f3.png",
+            "480,992": "grass2.png",
+            "512,992": "grass_f3.png",
+            "544,992": "grass2.png",
+            "288,1024": "grass1.png",
+            "320,1024": "grass_f3.png",
+            "352,1024": "grass3.png",
+            "384,1024": "grass_f1.png",
+            "416,1024": "grass_f3.png",
+            "448,1024": "grass3.png",
+            "480,1024": "grass_f1.png",
+            "512,1024": "grass3.png",
+            "544,1024": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1216,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,1216": "grass1.png",
+            "320,1216": "grass_f3.png",
+            "352,1216": "grass_f1.png",
+            "384,1216": "grass2.png",
+            "416,1216": "grass_f3.png",
+            "448,1216": "grass3.png",
+            "480,1216": "grass2.png",
+            "512,1216": "grass3.png",
+            "544,1216": "grass_f3.png",
+            "288,1248": "grass3.png",
+            "320,1248": "grass2.png",
+            "352,1248": "grass3.png",
+            "384,1248": "grass_f3.png",
+            "416,1248": "grass3.png",
+            "448,1248": "grass_f3.png",
+            "480,1248": "grass3.png",
+            "512,1248": "grass2.png",
+            "544,1248": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "288,1056": "grass3.png",
+            "320,1056": "grass_f1.png",
+            "288,1088": "grass_f3.png",
+            "320,1088": "grass3.png",
+            "288,1120": "grass3.png",
+            "320,1120": "grass_f1.png",
+            "288,1152": "grass_f3.png",
+            "320,1152": "grass3.png",
+            "288,1184": "grass2.png",
+            "320,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 512,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "512,1056": "grass2.png",
+            "544,1056": "grass3.png",
+            "512,1088": "grass_f3.png",
+            "544,1088": "grass1.png",
+            "512,1120": "grass1.png",
+            "544,1120": "grass3.png",
+            "512,1152": "grass_f3.png",
+            "544,1152": "grass2.png",
+            "512,1184": "grass2.png",
+            "544,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "water",
+          "x": 352,
+          "y": 1088,
+          "w": 32,
+          "h": 128
+        },
+        {
+          "type": "water",
+          "x": 352,
+          "y": 1056,
+          "w": 160,
+          "h": 32
+        },
+        {
+          "type": "water",
+          "x": 480,
+          "y": 1088,
+          "w": 32,
+          "h": 128
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1184,
+          "w": 96,
+          "h": 32
+        }
+      ],
+      "wall_regions": [
+        {
+          "x": 192,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 1376,
+          "w": 416,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 352,
+          "y": 1184,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 352,
+          "y": 1056,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 1056,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 1184,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 192,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 864,
+          "w": 416,
+          "h": 32
+        }
+      ],
+      "stairways": [
+        {
+          "x": 224,
+          "y": 1344,
+          "w": 416,
+          "h": 32,
+          "from_layer": 1,
+          "to_layer": 0,
+          "direction": "down"
+        },
+        {
+          "x": 224,
+          "y": 896,
+          "w": 416,
+          "h": 32,
+          "from_layer": 1,
+          "to_layer": 2,
+          "direction": "up"
+        }
+      ],
+      "enemies": []
+    },
+    {
+      "elevation": 2,
+      "bg_color": [
+        90,
+        85,
+        78
+      ],
+      "floor_regions": [
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 928,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,928": "stone2.png",
+            "256,928": "stone3.png",
+            "288,928": "stone2.png",
+            "320,928": "stone3.png",
+            "352,928": "stone2.png",
+            "384,928": "stone3.png",
+            "416,928": "stone2.png",
+            "448,928": "stone1.png",
+            "480,928": "stone3.png",
+            "512,928": "stone2.png",
+            "544,928": "stone1.png",
+            "576,928": "stone2.png",
+            "608,928": "stone3.png",
+            "224,960": "stone1.png",
+            "256,960": "stone2.png",
+            "288,960": "stone3.png",
+            "320,960": "stone2.png",
+            "352,960": "stone1.png",
+            "384,960": "stone2.png",
+            "416,960": "stone3.png",
+            "448,960": "stone2.png",
+            "480,960": "stone1.png",
+            "512,960": "stone3.png",
+            "544,960": "stone2.png",
+            "576,960": "stone3.png",
+            "608,960": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "224,992": "stone2.png",
+            "256,992": "stone1.png",
+            "224,1024": "stone3.png",
+            "256,1024": "stone2.png",
+            "224,1056": "stone2.png",
+            "256,1056": "stone3.png",
+            "224,1088": "stone1.png",
+            "256,1088": "stone2.png",
+            "224,1120": "stone2.png",
+            "256,1120": "stone1.png",
+            "224,1152": "stone3.png",
+            "256,1152": "stone2.png",
+            "224,1184": "stone2.png",
+            "256,1184": "stone3.png",
+            "224,1216": "stone3.png",
+            "256,1216": "stone2.png",
+            "224,1248": "stone1.png",
+            "256,1248": "stone3.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 576,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "576,992": "stone1.png",
+            "608,992": "stone3.png",
+            "576,1024": "stone2.png",
+            "608,1024": "stone1.png",
+            "576,1056": "stone1.png",
+            "608,1056": "stone3.png",
+            "576,1088": "stone2.png",
+            "608,1088": "stone1.png",
+            "576,1120": "stone3.png",
+            "608,1120": "stone2.png",
+            "576,1152": "stone2.png",
+            "608,1152": "stone3.png",
+            "576,1184": "stone1.png",
+            "608,1184": "stone2.png",
+            "576,1216": "stone2.png",
+            "608,1216": "stone3.png",
+            "576,1248": "stone1.png",
+            "608,1248": "stone2.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 992,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,992": "grass2.png",
+            "320,992": "grass3.png",
+            "352,992": "grass_f3.png",
+            "384,992": "grass1.png",
+            "416,992": "grass3.png",
+            "448,992": "grass_f3.png",
+            "480,992": "grass2.png",
+            "512,992": "grass_f3.png",
+            "544,992": "grass2.png",
+            "288,1024": "grass1.png",
+            "320,1024": "grass_f3.png",
+            "352,1024": "grass3.png",
+            "384,1024": "grass_f1.png",
+            "416,1024": "grass_f3.png",
+            "448,1024": "grass3.png",
+            "480,1024": "grass_f1.png",
+            "512,1024": "grass3.png",
+            "544,1024": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1216,
+          "w": 288,
+          "h": 32,
+          "tiles": {
+            "288,1216": "grass1.png",
+            "320,1216": "grass_f3.png",
+            "352,1216": "grass_f1.png",
+            "384,1216": "grass2.png",
+            "416,1216": "grass_f3.png",
+            "448,1216": "grass3.png",
+            "480,1216": "grass2.png",
+            "512,1216": "grass3.png",
+            "544,1216": "grass_f3.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1248,
+          "w": 96,
+          "h": 32,
+          "tiles": {
+            "288,1248": "grass3.png",
+            "320,1248": "grass2.png",
+            "352,1248": "grass3.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 480,
+          "y": 1248,
+          "w": 96,
+          "h": 32,
+          "tiles": {
+            "480,1248": "grass3.png",
+            "512,1248": "grass2.png",
+            "544,1248": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "288,1056": "grass3.png",
+            "320,1056": "grass_f1.png",
+            "288,1088": "grass_f3.png",
+            "320,1088": "grass3.png",
+            "288,1120": "grass3.png",
+            "320,1120": "grass_f1.png",
+            "288,1152": "grass_f3.png",
+            "320,1152": "grass3.png",
+            "288,1184": "grass2.png",
+            "320,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 512,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "512,1056": "grass2.png",
+            "544,1056": "grass3.png",
+            "512,1088": "grass_f3.png",
+            "544,1088": "grass1.png",
+            "512,1120": "grass1.png",
+            "544,1120": "grass3.png",
+            "512,1152": "grass_f3.png",
+            "544,1152": "grass2.png",
+            "512,1184": "grass2.png",
+            "544,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "chest",
+          "x": 384,
+          "y": 1248,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "water",
+          "x": 352,
+          "y": 1056,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "type": "water",
+          "x": 480,
+          "y": 1056,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1184,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1056,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 1280,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,1280": "stone2.png",
+            "256,1280": "stone3.png",
+            "288,1280": "stone2.png",
+            "320,1280": "stone3.png",
+            "352,1280": "stone2.png",
+            "384,1280": "stone3.png",
+            "416,1280": "stone2.png",
+            "448,1280": "stone1.png",
+            "480,1280": "stone3.png",
+            "512,1280": "stone2.png",
+            "544,1280": "stone1.png",
+            "576,1280": "stone2.png",
+            "608,1280": "stone3.png",
+            "224,1312": "stone1.png",
+            "256,1312": "stone2.png",
+            "288,1312": "stone3.png",
+            "320,1312": "stone2.png",
+            "352,1312": "stone1.png",
+            "384,1312": "stone2.png",
+            "416,1312": "stone3.png",
+            "448,1312": "stone2.png",
+            "480,1312": "stone1.png",
+            "512,1312": "stone3.png",
+            "544,1312": "stone2.png",
+            "576,1312": "stone3.png",
+            "608,1312": "stone2.png"
+          }
+        }
+      ],
+      "wall_regions": [
+        {
+          "x": 192,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 864,
+          "w": 416,
+          "h": 32
+        },
+        {
+          "x": 192,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 1376,
+          "w": 416,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 352,
+          "y": 1056,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 1056,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 1184,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 352,
+          "y": 1184,
+          "w": 32,
+          "h": 32
+        }
+      ],
+      "stairways": [
+        {
+          "x": 224,
+          "y": 896,
+          "w": 416,
+          "h": 32,
+          "from_layer": 2,
+          "to_layer": 1,
+          "direction": "up"
+        },
+        {
+          "x": 224,
+          "y": 1344,
+          "w": 416,
+          "h": 32,
+          "from_layer": 2,
+          "to_layer": 3,
+          "direction": "down"
+        }
+      ],
+      "enemies": [
+        {
+          "type": "lvl1enemy",
+          "x": 256,
+          "y": 1152,
+          "facing": "left",
+          "pattern": null
+        },
+        {
+          "type": "lvl1enemy",
+          "x": 640,
+          "y": 1152,
+          "facing": "right",
+          "pattern": null
+        },
+        {
+          "type": "lvl1enemy",
+          "x": 736,
+          "y": 1088,
+          "facing": "left",
+          "pattern": null
+        }
+      ]
+    },
+    {
+      "elevation": 3,
+      "bg_color": [
+        90,
+        85,
+        78
+      ],
+      "floor_regions": [
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 928,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,928": "stone2.png",
+            "256,928": "stone3.png",
+            "288,928": "stone2.png",
+            "320,928": "stone3.png",
+            "352,928": "stone2.png",
+            "384,928": "stone3.png",
+            "416,928": "stone2.png",
+            "448,928": "stone1.png",
+            "480,928": "stone3.png",
+            "512,928": "stone2.png",
+            "544,928": "stone1.png",
+            "576,928": "stone2.png",
+            "608,928": "stone3.png",
+            "224,960": "stone1.png",
+            "256,960": "stone2.png",
+            "288,960": "stone3.png",
+            "320,960": "stone2.png",
+            "352,960": "stone1.png",
+            "384,960": "stone2.png",
+            "416,960": "stone3.png",
+            "448,960": "stone2.png",
+            "480,960": "stone1.png",
+            "512,960": "stone3.png",
+            "544,960": "stone2.png",
+            "576,960": "stone3.png",
+            "608,960": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "224,992": "stone2.png",
+            "256,992": "stone1.png",
+            "224,1024": "stone3.png",
+            "256,1024": "stone2.png",
+            "224,1056": "stone2.png",
+            "256,1056": "stone3.png",
+            "224,1088": "stone1.png",
+            "256,1088": "stone2.png",
+            "224,1120": "stone2.png",
+            "256,1120": "stone1.png",
+            "224,1152": "stone3.png",
+            "256,1152": "stone2.png",
+            "224,1184": "stone2.png",
+            "256,1184": "stone3.png",
+            "224,1216": "stone3.png",
+            "256,1216": "stone2.png",
+            "224,1248": "stone1.png",
+            "256,1248": "stone3.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 576,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "576,992": "stone1.png",
+            "608,992": "stone3.png",
+            "576,1024": "stone2.png",
+            "608,1024": "stone1.png",
+            "576,1056": "stone1.png",
+            "608,1056": "stone3.png",
+            "576,1088": "stone2.png",
+            "608,1088": "stone1.png",
+            "576,1120": "stone3.png",
+            "608,1120": "stone2.png",
+            "576,1152": "stone2.png",
+            "608,1152": "stone3.png",
+            "576,1184": "stone1.png",
+            "608,1184": "stone2.png",
+            "576,1216": "stone2.png",
+            "608,1216": "stone3.png",
+            "576,1248": "stone1.png",
+            "608,1248": "stone2.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 992,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,992": "grass2.png",
+            "320,992": "grass3.png",
+            "352,992": "grass_f3.png",
+            "384,992": "grass1.png",
+            "416,992": "grass3.png",
+            "448,992": "grass_f3.png",
+            "480,992": "grass2.png",
+            "512,992": "grass_f3.png",
+            "544,992": "grass2.png",
+            "288,1024": "grass1.png",
+            "320,1024": "grass_f3.png",
+            "352,1024": "grass3.png",
+            "384,1024": "grass_f1.png",
+            "416,1024": "grass_f3.png",
+            "448,1024": "grass3.png",
+            "480,1024": "grass_f1.png",
+            "512,1024": "grass3.png",
+            "544,1024": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1216,
+          "w": 288,
+          "h": 32,
+          "tiles": {
+            "288,1216": "grass1.png",
+            "320,1216": "grass_f3.png",
+            "352,1216": "grass_f1.png",
+            "384,1216": "grass2.png",
+            "416,1216": "grass_f3.png",
+            "448,1216": "grass3.png",
+            "480,1216": "grass2.png",
+            "512,1216": "grass3.png",
+            "544,1216": "grass_f3.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1248,
+          "w": 64,
+          "h": 32,
+          "tiles": {
+            "288,1248": "grass3.png",
+            "320,1248": "grass2.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 512,
+          "y": 1248,
+          "w": 64,
+          "h": 32,
+          "tiles": {
+            "512,1248": "grass2.png",
+            "544,1248": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "288,1056": "grass3.png",
+            "320,1056": "grass_f1.png",
+            "288,1088": "grass_f3.png",
+            "320,1088": "grass3.png",
+            "288,1120": "grass3.png",
+            "320,1120": "grass_f1.png",
+            "288,1152": "grass_f3.png",
+            "320,1152": "grass3.png",
+            "288,1184": "grass2.png",
+            "320,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 512,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "512,1056": "grass2.png",
+            "544,1056": "grass3.png",
+            "512,1088": "grass_f3.png",
+            "544,1088": "grass1.png",
+            "512,1120": "grass1.png",
+            "544,1120": "grass3.png",
+            "512,1152": "grass_f3.png",
+            "544,1152": "grass2.png",
+            "512,1184": "grass2.png",
+            "544,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "water",
+          "x": 352,
+          "y": 1056,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "type": "water",
+          "x": 480,
+          "y": 1056,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1184,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1056,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 1280,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,1280": "stone2.png",
+            "256,1280": "stone3.png",
+            "288,1280": "stone2.png",
+            "320,1280": "stone3.png",
+            "352,1280": "stone2.png",
+            "384,1280": "stone3.png",
+            "416,1280": "stone2.png",
+            "448,1280": "stone1.png",
+            "480,1280": "stone3.png",
+            "512,1280": "stone2.png",
+            "544,1280": "stone1.png",
+            "576,1280": "stone2.png",
+            "608,1280": "stone3.png",
+            "224,1312": "stone1.png",
+            "256,1312": "stone2.png",
+            "288,1312": "stone3.png",
+            "320,1312": "stone2.png",
+            "352,1312": "stone1.png",
+            "384,1312": "stone2.png",
+            "416,1312": "stone3.png",
+            "448,1312": "stone2.png",
+            "480,1312": "stone1.png",
+            "512,1312": "stone3.png",
+            "544,1312": "stone2.png",
+            "576,1312": "stone3.png",
+            "608,1312": "stone2.png"
+          }
+        },
+        {
+          "type": "lava",
+          "x": 352,
+          "y": 1248,
+          "w": 160,
+          "h": 32
+        }
+      ],
+      "wall_regions": [
+        {
+          "x": 192,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 864,
+          "w": 416,
+          "h": 32
+        },
+        {
+          "x": 192,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 1376,
+          "w": 416,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 1344,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 352,
+          "y": 1056,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 1056,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 352,
+          "y": 1184,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 480,
+          "y": 1184,
+          "w": 32,
+          "h": 32
+        }
+      ],
+      "stairways": [
+        {
+          "x": 224,
+          "y": 896,
+          "w": 416,
+          "h": 32,
+          "from_layer": 3,
+          "to_layer": 4,
+          "direction": "up"
+        },
+        {
+          "x": 224,
+          "y": 1344,
+          "w": 416,
+          "h": 32,
+          "from_layer": 3,
+          "to_layer": 2,
+          "direction": "down"
+        }
+      ],
+      "enemies": []
+    },
+    {
+      "elevation": 4,
+      "bg_color": [
+        90,
+        85,
+        78
+      ],
+      "floor_regions": [
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 928,
+          "w": 416,
+          "h": 64,
+          "tiles": {
+            "224,928": "stone2.png",
+            "256,928": "stone3.png",
+            "288,928": "stone2.png",
+            "320,928": "stone3.png",
+            "352,928": "stone2.png",
+            "384,928": "stone3.png",
+            "416,928": "stone2.png",
+            "448,928": "stone1.png",
+            "480,928": "stone3.png",
+            "512,928": "stone2.png",
+            "544,928": "stone1.png",
+            "576,928": "stone2.png",
+            "608,928": "stone3.png",
+            "224,960": "stone1.png",
+            "256,960": "stone2.png",
+            "288,960": "stone3.png",
+            "320,960": "stone2.png",
+            "352,960": "stone1.png",
+            "384,960": "stone2.png",
+            "416,960": "stone3.png",
+            "448,960": "stone2.png",
+            "480,960": "stone1.png",
+            "512,960": "stone3.png",
+            "544,960": "stone2.png",
+            "576,960": "stone3.png",
+            "608,960": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "224,992": "stone2.png",
+            "256,992": "stone1.png",
+            "224,1024": "stone3.png",
+            "256,1024": "stone2.png",
+            "224,1056": "stone2.png",
+            "256,1056": "stone3.png",
+            "224,1088": "stone1.png",
+            "256,1088": "stone2.png",
+            "224,1120": "stone2.png",
+            "256,1120": "stone1.png",
+            "224,1152": "stone3.png",
+            "256,1152": "stone2.png",
+            "224,1184": "stone2.png",
+            "256,1184": "stone3.png",
+            "224,1216": "stone3.png",
+            "256,1216": "stone2.png",
+            "224,1248": "stone1.png",
+            "256,1248": "stone3.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 576,
+          "y": 992,
+          "w": 64,
+          "h": 288,
+          "tiles": {
+            "576,992": "stone1.png",
+            "608,992": "stone3.png",
+            "576,1024": "stone2.png",
+            "608,1024": "stone1.png",
+            "576,1056": "stone1.png",
+            "608,1056": "stone3.png",
+            "576,1088": "stone2.png",
+            "608,1088": "stone1.png",
+            "576,1120": "stone3.png",
+            "608,1120": "stone2.png",
+            "576,1152": "stone2.png",
+            "608,1152": "stone3.png",
+            "576,1184": "stone1.png",
+            "608,1184": "stone2.png",
+            "576,1216": "stone2.png",
+            "608,1216": "stone3.png",
+            "576,1248": "stone1.png",
+            "608,1248": "stone2.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 992,
+          "w": 288,
+          "h": 64,
+          "tiles": {
+            "288,992": "grass2.png",
+            "320,992": "grass3.png",
+            "352,992": "grass_f3.png",
+            "384,992": "grass1.png",
+            "416,992": "grass3.png",
+            "448,992": "grass_f3.png",
+            "480,992": "grass2.png",
+            "512,992": "grass_f3.png",
+            "544,992": "grass2.png",
+            "288,1024": "grass1.png",
+            "320,1024": "grass_f3.png",
+            "352,1024": "grass3.png",
+            "384,1024": "grass_f1.png",
+            "416,1024": "grass_f3.png",
+            "448,1024": "grass3.png",
+            "480,1024": "grass_f1.png",
+            "512,1024": "grass3.png",
+            "544,1024": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1216,
+          "w": 288,
+          "h": 32,
+          "tiles": {
+            "288,1216": "grass1.png",
+            "320,1216": "grass_f3.png",
+            "352,1216": "grass_f1.png",
+            "384,1216": "grass2.png",
+            "416,1216": "grass_f3.png",
+            "448,1216": "grass3.png",
+            "480,1216": "grass2.png",
+            "512,1216": "grass3.png",
+            "544,1216": "grass_f3.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1248,
+          "w": 96,
+          "h": 32,
+          "tiles": {
+            "288,1248": "grass3.png",
+            "320,1248": "grass2.png",
+            "352,1248": "grass3.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 480,
+          "y": 1248,
+          "w": 96,
+          "h": 32,
+          "tiles": {
+            "480,1248": "grass3.png",
+            "512,1248": "grass2.png",
+            "544,1248": "grass1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 288,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "288,1056": "grass3.png",
+            "320,1056": "grass_f1.png",
+            "288,1088": "grass_f3.png",
+            "320,1088": "grass3.png",
+            "288,1120": "grass3.png",
+            "320,1120": "grass_f1.png",
+            "288,1152": "grass_f3.png",
+            "320,1152": "grass3.png",
+            "288,1184": "grass2.png",
+            "320,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "grass",
+          "x": 512,
+          "y": 1056,
+          "w": 64,
+          "h": 160,
+          "tiles": {
+            "512,1056": "grass2.png",
+            "544,1056": "grass3.png",
+            "512,1088": "grass_f3.png",
+            "544,1088": "grass1.png",
+            "512,1120": "grass1.png",
+            "544,1120": "grass3.png",
+            "512,1152": "grass_f3.png",
+            "544,1152": "grass2.png",
+            "512,1184": "grass2.png",
+            "544,1184": "grass_f1.png"
+          }
+        },
+        {
+          "type": "chest",
+          "x": 384,
+          "y": 1248,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "water",
+          "x": 352,
+          "y": 1056,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "type": "water",
+          "x": 480,
+          "y": 1056,
+          "w": 32,
+          "h": 160
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1184,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "water",
+          "x": 384,
+          "y": 1056,
+          "w": 96,
+          "h": 32
+        },
+        {
+          "type": "stone",
+          "x": 224,
+          "y": 1280,
+          "w": 160,
+          "h": 64,
+          "tiles": {
+            "224,1280": "stone2.png",
+            "256,1280": "stone3.png",
+            "288,1280": "stone2.png",
+            "320,1280": "stone3.png",
+            "352,1280": "stone2.png",
+            "384,1280": "stone3.png",
+            "416,1280": "stone2.png",
+            "448,1280": "stone1.png",
+            "480,1280": "stone3.png",
+            "512,1280": "stone2.png",
+            "544,1280": "stone1.png",
+            "576,1280": "stone2.png",
+            "608,1280": "stone3.png",
+            "224,1312": "stone1.png",
+            "256,1312": "stone2.png",
+            "288,1312": "stone3.png",
+            "320,1312": "stone2.png",
+            "352,1312": "stone1.png",
+            "384,1312": "stone2.png",
+            "416,1312": "stone3.png",
+            "448,1312": "stone2.png",
+            "480,1312": "stone1.png",
+            "512,1312": "stone3.png",
+            "544,1312": "stone2.png",
+            "576,1312": "stone3.png",
+            "608,1312": "stone2.png"
+          }
+        },
+        {
+          "type": "stone",
+          "x": 480,
+          "y": 1280,
+          "w": 160,
+          "h": 64,
+          "tiles": {
+            "480,1280": "stone2.png",
+            "512,1280": "stone3.png",
+            "544,1280": "stone2.png",
+            "576,1280": "stone3.png",
+            "608,1280": "stone2.png",
+            "640,1280": "stone3.png",
+            "672,1280": "stone2.png",
+            "704,1280": "stone1.png",
+            "736,1280": "stone3.png",
+            "768,1280": "stone2.png",
+            "800,1280": "stone1.png",
+            "832,1280": "stone2.png",
+            "864,1280": "stone3.png",
+            "480,1312": "stone1.png",
+            "512,1312": "stone2.png",
+            "544,1312": "stone3.png",
+            "576,1312": "stone2.png",
+            "608,1312": "stone1.png",
+            "640,1312": "stone2.png",
+            "672,1312": "stone3.png",
+            "704,1312": "stone2.png",
+            "736,1312": "stone1.png",
+            "768,1312": "stone3.png",
+            "800,1312": "stone2.png",
+            "832,1312": "stone3.png",
+            "864,1312": "stone2.png"
+          }
+        }
+      ],
+      "wall_regions": [
+        {
+          "x": 192,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 640,
+          "y": 896,
+          "w": 32,
+          "h": 32
+        },
+        {
+          "x": 224,
+          "y": 864,
+          "w": 416,
+          "h": 32
+        }
+      ],
+      "stairways": [
+        {
+          "x": 224,
+          "y": 896,
+          "w": 416,
+          "h": 32,
+          "from_layer": 4,
+          "to_layer": 3,
+          "direction": "up"
+        }
+      ],
+      "enemies": []
+    }
+  ]
+}
