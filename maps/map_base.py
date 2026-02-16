@@ -139,6 +139,9 @@ class MapBase:
 
     def check_fall(self, entity):
         """If entity is on a layer with no floor beneath, drop to the next layer below."""
+        # Don't re-trigger while already falling
+        if getattr(entity, "falling", False):
+            return
         layer = self.get_layer(entity.current_layer)
         if layer is None or layer.elevation == 0:
             return
@@ -157,7 +160,12 @@ class MapBase:
             if candidate.elevation < layer.elevation:
                 if best is None or candidate.elevation > best.elevation:
                     best = candidate
-        entity.current_layer = best.elevation if best else 0
+        target = best.elevation if best else 0
+        # Use animated fall for the player, instant for other entities
+        if hasattr(entity, "start_fall"):
+            entity.start_fall(target)
+        else:
+            entity.current_layer = target
 
     def check_stairway_transitions(self, entity):
         # After a transition, ignore all stairways until the player steps

@@ -63,6 +63,19 @@ class Player:
         self.current_layer = 0
 
         # -----------------------------
+        # Fall animation
+        # -----------------------------
+        self.falling = False
+        self._fall_timer = 0.0
+        self._fall_duration = stats["fall_duration"]
+        self._fall_speed_increase = stats["fall_speed_increase"]
+        self._min_fall_duration = stats["min_fall_duration"]
+        self._effective_fall_duration = self._fall_duration
+        self._fall_start_layer = 0
+        self._fall_target_layer = 0
+        self._fall_landed = False
+
+        # -----------------------------
         # Awareness and Visibility
         # -----------------------------
         self.limit_view = True
@@ -102,6 +115,25 @@ class Player:
         # -----------------------------
         attack_active = sword.is_active() if sword else False
         dodging = self.dodge_remaining > 0
+
+        if self._fall_landed:
+            # Landed last frame — if check_fall didn't extend the fall,
+            # the fall is truly over so apply the camera shake now.
+            self._fall_landed = False
+            if not self.falling:
+                speed_ratio = 1.0 - (self._effective_fall_duration / self._fall_duration)
+                camera.shake(
+                    duration=0.05 + speed_ratio * 0.5,
+                    strength=3 + speed_ratio * 30,
+                )
+
+        if self.falling:
+            if self._fall_timer >= self._effective_fall_duration:
+                self.falling = False
+                self._fall_timer = 0.0
+                self.current_layer = self._fall_target_layer
+                self._fall_landed = True
+            return  # skip all input while falling
 
         self.sneaking = (not dodging and input_manager.is_down("sneak"))
 
@@ -220,6 +252,30 @@ class Player:
         if self.sneak_attack_timer > 0:
             self.sneak_attack_timer -= dt
 
+        # Fall animation (timer only — completion handled in update)
+        if self.falling:
+            self._fall_timer += dt
+
+    # =====================================================
+    # FALL
+    # =====================================================
+
+    def start_fall(self, target_layer):
+        """Begin or extend the fall animation toward *target_layer*."""
+        if not self.falling:
+            if not self._fall_landed:
+                self._fall_start_layer = self.current_layer
+            self._fall_landed = False
+            self.falling = True
+            self._fall_timer = 0.0
+        # Update target (may extend a fall already in progress)
+        self._fall_target_layer = target_layer
+        layers_fallen = max(1, self._fall_start_layer - target_layer)
+        self._effective_fall_duration = max(
+            self._min_fall_duration,
+            self._fall_duration - self._fall_speed_increase * (layers_fallen - 1),
+        )
+
     # =====================================================
     # DRAW
     # =====================================================
@@ -228,6 +284,17 @@ class Player:
         color = self.color
         if self.sneaking:
             color = (color[0] // 2, color[1] // 2, color[2] // 2)
+
+        # Fall animation: shrink + fade
+        if self.falling:
+            t = self._fall_timer / self._effective_fall_duration  # 0 → 1
+            scale = 1.0 - t  # shrink from full to zero
+            alpha = int(255 * (1.0 - t))
+            draw_radius = max(1, int(self.radius * scale))
+            surf = pygame.Surface((draw_radius * 2, draw_radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(surf, (*color, alpha), (draw_radius, draw_radius), draw_radius)
+            screen.blit(surf, camera.apply(self.pos) - pygame.Vector2(draw_radius, draw_radius))
+            return  # skip normal drawing and weapons while falling
 
         # Blink transparency while invulnerable
         if self.invuln_timer > 0 and int(self.invuln_timer * self.invuln_freq * 2) % 2 == 0:

@@ -16,4 +16,7 @@ PLAYER_STATS = {
     "dodge_distance": 120,
     "dodge_speed": 600,
     "sneak_speed_factor": 0.4,
+    "fall_duration": 0.6,
+    "fall_speed_increase": 0.2,
+    "min_fall_duration": 0.3,
 }
