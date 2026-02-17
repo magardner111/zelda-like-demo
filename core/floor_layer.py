@@ -21,6 +21,16 @@ class FloorLayer:
     def get_effect_regions(self):
         return [r for r in self.floor_regions if isinstance(r, LiquidRegion)]
 
+    def point_on_floor(self, px, py):
+        """Check if a single point is inside any floor or wall region rect."""
+        for region in self.floor_regions:
+            if region.rect.collidepoint(px, py):
+                return True
+        for region in self.wall_regions:
+            if region.rect.collidepoint(px, py):
+                return True
+        return False
+
     def has_floor_at(self, pos, radius):
         """Check if any floor or wall region overlaps the given circle."""
         for region in self.floor_regions:

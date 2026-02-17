@@ -1,7 +1,14 @@
 import json
+import math
 
 import pygame
 
+from settings import EDGE_SLIDE_THRESHOLD, EDGE_SLIDE_ACCEL, EDGE_SLIDE_MAX_SPEED
+
+_PI_OVER_4 = math.pi / 4
+_SLIDE_SAMPLE_DIRS = [
+    (math.cos(i * _PI_OVER_4), math.sin(i * _PI_OVER_4)) for i in range(8)
+]
 from core.collision import resolve_entity_vs_regions
 from core.enemy_base import Enemy
 from core.floor_layer import FloorLayer
@@ -133,9 +140,63 @@ class MapBase:
 
             self.check_stairway_transitions(enemy)
 
+            self.check_edge_slide(enemy, dt)
+
             self.check_fall(enemy)
 
         self.enemies = [e for e in self.enemies if e.health > 0]
+
+    def check_edge_slide(self, entity, dt):
+        """Apply LTTP-style edge sliding when entity is partially off a ledge.
+
+        Samples 8 points at radius * EDGE_SLIDE_THRESHOLD from the entity
+        center. Any sample point over void means the entity is near a ledge
+        and a slide force accelerates them toward the void.
+        """
+        if getattr(entity, "falling", False):
+            return
+        layer = self.get_layer(entity.current_layer)
+        if layer is None or layer.elevation == 0:
+            return
+        # Skip if entity is on a stairway
+        for stairway in self.stairways:
+            if (stairway.from_layer == entity.current_layer or
+                    stairway.to_layer == entity.current_layer):
+                if stairway._overlaps(entity):
+                    return
+
+        r = getattr(entity, "radius", 0)
+
+        # Full circle must still overlap floor; otherwise let check_fall handle
+        if not layer.has_floor_at(entity.pos, r):
+            return
+
+        # Sample 8 evenly spaced points at test_r from center
+        test_r = r * EDGE_SLIDE_THRESHOLD
+        slide_dir = pygame.Vector2(0, 0)
+        off_count = 0
+        ex, ey = entity.pos.x, entity.pos.y
+        for dx, dy in _SLIDE_SAMPLE_DIRS:
+            if not layer.point_on_floor(ex + test_r * dx, ey + test_r * dy):
+                off_count += 1
+                slide_dir.x += dx
+                slide_dir.y += dy
+
+        if off_count == 0:
+            # All sample points on floor → safe
+            entity._slide_vel = pygame.Vector2(0, 0)
+            return
+
+        if slide_dir.length_squared() > 0:
+            slide_dir = slide_dir.normalize()
+        else:
+            slide_dir = pygame.Vector2(0, 1)
+
+        entity._slide_vel += slide_dir * EDGE_SLIDE_ACCEL * dt
+        if entity._slide_vel.length() > EDGE_SLIDE_MAX_SPEED:
+            entity._slide_vel = entity._slide_vel.normalize() * EDGE_SLIDE_MAX_SPEED
+
+        entity.pos += entity._slide_vel * dt
 
     def check_fall(self, entity):
         """If entity is on a layer with no floor beneath, drop to the next layer below."""

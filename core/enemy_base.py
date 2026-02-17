@@ -55,6 +55,11 @@ class Enemy:
         self.current_layer = 0
 
         # -----------------------------
+        # Edge Slide
+        # -----------------------------
+        self._slide_vel = pygame.Vector2(0, 0)
+
+        # -----------------------------
         # Visibility fade
         # -----------------------------
         self.visibility_alpha = 255

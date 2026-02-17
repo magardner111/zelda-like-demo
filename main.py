@@ -134,6 +134,9 @@ def main():
             # Stairway transitions
             current_map.check_stairway_transitions(player)
 
+            # Edge slide on upper layers
+            current_map.check_edge_slide(player, dt)
+
             # Fall off upper layers if no floor beneath
             current_map.check_fall(player)
 

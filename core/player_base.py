@@ -63,6 +63,11 @@ class Player:
         self.current_layer = 0
 
         # -----------------------------
+        # Edge Slide
+        # -----------------------------
+        self._slide_vel = pygame.Vector2(0, 0)
+
+        # -----------------------------
         # Fall animation
         # -----------------------------
         self.falling = False
