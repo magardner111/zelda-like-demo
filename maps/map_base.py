@@ -161,11 +161,7 @@ class MapBase:
                 if best is None or candidate.elevation > best.elevation:
                     best = candidate
         target = best.elevation if best else 0
-        # Use animated fall for the player, instant for other entities
-        if hasattr(entity, "start_fall"):
-            entity.start_fall(target)
-        else:
-            entity.current_layer = target
+        entity.start_fall(target)
 
     def check_stairway_transitions(self, entity):
         # After a transition, ignore all stairways until the player steps

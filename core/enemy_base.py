@@ -65,6 +65,19 @@ class Enemy:
         self.facing = pygame.Vector2(0, 1)  # default: face down
 
         # -----------------------------
+        # Fall animation
+        # -----------------------------
+        self.falling = False
+        self._fall_timer = 0.0
+        self._fall_duration = stats.get("fall_duration", 0.6)
+        self._fall_speed_increase = stats.get("fall_speed_increase", 0.2)
+        self._min_fall_duration = stats.get("min_fall_duration", 0.3)
+        self._effective_fall_duration = self._fall_duration
+        self._fall_start_layer = 0
+        self._fall_target_layer = 0
+        self._fall_landed = False
+
+        # -----------------------------
         # Pattern (None for now)
         # -----------------------------
         self.pattern = None
@@ -74,6 +87,19 @@ class Enemy:
     # =====================================================
 
     def update(self, dt, player, solid_regions):
+        # Fall animation tick
+        if self.falling:
+            self._fall_timer += dt
+            if self._fall_timer >= self._effective_fall_duration:
+                self.falling = False
+                self._fall_timer = 0.0
+                self.current_layer = self._fall_target_layer
+                self._fall_landed = True
+            return  # skip AI/movement while falling
+
+        if self._fall_landed:
+            self._fall_landed = False
+
         detected = self._detect_player(player, solid_regions)
 
         if self.phase == "pattern":
@@ -161,6 +187,26 @@ class Enemy:
                 self.knockback_timer = 0.2
 
     # =====================================================
+    # FALL
+    # =====================================================
+
+    def start_fall(self, target_layer):
+        """Begin or extend the fall animation toward *target_layer*."""
+        if not self.falling:
+            if not self._fall_landed:
+                self._fall_start_layer = self.current_layer
+            self._fall_landed = False
+            self.falling = True
+            self._fall_timer = 0.0
+        # Update target (may extend a fall already in progress)
+        self._fall_target_layer = target_layer
+        layers_fallen = max(1, self._fall_start_layer - target_layer)
+        self._effective_fall_duration = max(
+            self._min_fall_duration,
+            self._fall_duration - self._fall_speed_increase * (layers_fallen - 1),
+        )
+
+    # =====================================================
     # DRAW
     # =====================================================
 
@@ -169,6 +215,18 @@ class Enemy:
             return
 
         draw_color = (255, 255, 255) if self.flash_timer > 0 else self.color
+
+        # Fall animation: shrink + fade
+        if self.falling:
+            t = self._fall_timer / self._effective_fall_duration  # 0 → 1
+            scale = 1.0 - t
+            alpha = int(255 * (1.0 - t))
+            draw_size = max(1, int(self.size * scale))
+            surf = pygame.Surface((draw_size * 2, draw_size * 2), pygame.SRCALPHA)
+            surf.fill((*draw_color, alpha))
+            screen_pos = pygame.Vector2(camera.apply(self.pos))
+            screen.blit(surf, screen_pos - pygame.Vector2(draw_size, draw_size))
+            return  # skip normal drawing while falling
 
         rect = pygame.Rect(
             0, 0,

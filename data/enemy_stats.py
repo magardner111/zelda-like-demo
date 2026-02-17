@@ -9,5 +9,8 @@ ENEMY_STATS = {
         "chase_speed": 100,
         "knockback_resistance": 0,
         "alert_cooldown": 3.0,
+        "fall_duration": 0.6,
+        "fall_speed_increase": 0.2,
+        "min_fall_duration": 0.3,
     }
 }
