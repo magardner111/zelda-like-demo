@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tkinter-based map editor for the Zelda-like demo."""
 
+import base64
 import copy
+import io
 import json
 import os
 import random
@@ -9,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import tkinter as tk
+import zipfile
 from tkinter import colorchooser, filedialog, messagebox, simpledialog, ttk
 
 import platform
@@ -239,6 +242,10 @@ class MapEditor:
         self.selected_tile_type = None  # region type the tiles belong to
         self.tile_photos = {}           # cache: filepath -> PhotoImage
         self._scaled_tile_cache = {}    # cache: (filepath, size) -> scaled PhotoImage
+        self.tile_atile_frames = {}     # cache: filepath -> [PhotoImage, ...]
+        self._anim_frame_index = 0
+        self._anim_timer_id = None
+        self._canvas_has_anims = False
 
         # Selection state — list of (kind, index, layer_idx) tuples
         self.selected_items = []
@@ -275,6 +282,7 @@ class MapEditor:
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._refresh_layer_list()
         self._redraw_canvas()
+        self._anim_timer_id = self.root.after(150, self._tick_animation)
 
     # -----------------------------------------------------------------
     # UI construction
@@ -630,9 +638,34 @@ class MapEditor:
         return rgb_to_hex(min(255, nr), min(255, ng), min(255, nb))
 
     # -----------------------------------------------------------------
+    # Animation timer
+    # -----------------------------------------------------------------
+    def _tick_animation(self):
+        """Advance animated tile frames in the picker and canvas."""
+        self._anim_timer_id = self.root.after(150, self._tick_animation)
+        self._anim_frame_index += 1
+        # Update picker labels that show .atile tiles
+        for widget in self.tile_inner.winfo_children():
+            if not isinstance(widget, tk.Frame):
+                continue
+            for child in widget.winfo_children():
+                if not isinstance(child, tk.Label):
+                    continue
+                fp = getattr(child, "tile_filepath", None)
+                if fp and fp in self.tile_atile_frames:
+                    frames = self.tile_atile_frames[fp]
+                    img = frames[self._anim_frame_index % len(frames)]
+                    child.configure(image=img)
+                    child.photo = img
+        # Redraw canvas if it has animated tiles
+        if self._canvas_has_anims:
+            self._redraw_canvas()
+
+    # -----------------------------------------------------------------
     # Canvas rendering
     # -----------------------------------------------------------------
     def _redraw_canvas(self):
+        self._canvas_has_anims = False
         c = self.canvas
         c.delete("all")
 
@@ -1880,17 +1913,42 @@ class MapEditor:
 
     def _load_tile_photo(self, filepath):
         if filepath not in self.tile_photos:
-            try:
-                self.tile_photos[filepath] = tk.PhotoImage(file=filepath)
-            except tk.TclError:
-                return None
+            if filepath.lower().endswith(".atile"):
+                try:
+                    frames = []
+                    with zipfile.ZipFile(filepath, "r") as zf:
+                        names = sorted(
+                            (n for n in zf.namelist() if n.endswith(".png")),
+                            key=lambda n: int(os.path.splitext(os.path.basename(n))[0]),
+                        )
+                        for name in names:
+                            png_bytes = zf.read(name)
+                            img = tk.PhotoImage(
+                                data=base64.b64encode(png_bytes).decode("ascii")
+                            )
+                            frames.append(img)
+                    if not frames:
+                        return None
+                    self.tile_atile_frames[filepath] = frames
+                    self.tile_photos[filepath] = frames[0]
+                except (zipfile.BadZipFile, tk.TclError, ValueError):
+                    return None
+            else:
+                try:
+                    self.tile_photos[filepath] = tk.PhotoImage(file=filepath)
+                except tk.TclError:
+                    return None
         return self.tile_photos[filepath]
 
-    def _get_scaled_tile(self, filepath, target_size):
+    def _get_scaled_tile(self, filepath, target_size, frame_index=None):
         """Get a tile PhotoImage scaled to target_size pixels."""
-        cache_key = (filepath, target_size)
+        cache_key = (filepath, target_size, frame_index)
         if cache_key not in self._scaled_tile_cache:
-            photo = self._load_tile_photo(filepath)
+            if frame_index is not None and filepath in self.tile_atile_frames:
+                frames = self.tile_atile_frames[filepath]
+                photo = frames[frame_index % len(frames)]
+            else:
+                photo = self._load_tile_photo(filepath)
             if not photo or photo.width() == 0:
                 return None
             orig = photo.width()
@@ -1935,14 +1993,23 @@ class MapEditor:
             if not (region["x"] <= tx < region["x"] + region["w"]
                     and region["y"] <= ty < region["y"] + region["h"]):
                 continue
-            if tile_name not in scaled_cache:
+            is_atile = tile_name.lower().endswith(".atile")
+            if is_atile:
+                self._canvas_has_anims = True
+                frame_idx = self._anim_frame_index
+                cache_key = (tile_name, frame_idx)
+            else:
+                frame_idx = None
+                cache_key = tile_name
+            if cache_key not in scaled_cache:
                 tile_path = os.path.join(tile_dir, tile_name)
-                scaled = self._get_scaled_tile(tile_path, tile_screen_size)
+                scaled = self._get_scaled_tile(tile_path, tile_screen_size,
+                                               frame_index=frame_idx)
                 if not scaled:
                     continue
-                scaled_cache[tile_name] = scaled
+                scaled_cache[cache_key] = scaled
             sx, sy = self._map_to_screen(tx, ty)
-            c.create_image(sx, sy, image=scaled_cache[tile_name], anchor="nw")
+            c.create_image(sx, sy, image=scaled_cache[cache_key], anchor="nw")
 
     def _fill_region_tiles(self, region):
         """Fill all 32x32 grid cells in a region with the selected tiles."""
@@ -2016,17 +2083,17 @@ class MapEditor:
         tiles = []
         if os.path.isdir(tile_dir):
             tiles = sorted(f for f in os.listdir(tile_dir)
-                           if f.lower().endswith(('.png', '.gif', '.ppm', '.pgm')))
+                           if f.lower().endswith(('.png', '.gif', '.ppm', '.pgm', '.atile')))
 
         self.tile_picker_frame.pack(fill=tk.X, padx=4, pady=4)
 
         if not tiles:
             tk.Label(self.tile_inner, text="No tiles found", fg="#888888",
-                     bg="#333333").grid(row=0, column=0, columnspan=3)
+                     bg="#333333").grid(row=0, column=0, columnspan=6)
             return
 
         for i, filename in enumerate(tiles):
-            row, col = divmod(i, 3)
+            row, col = divmod(i, 6)
             filepath = os.path.join(tile_dir, filename)
             photo = self._load_tile_photo(filepath)
             if not photo:
@@ -2041,11 +2108,12 @@ class MapEditor:
             lbl.pack(padx=2, pady=2)
             lbl.photo = photo
             lbl.tile_name = filename
+            lbl.tile_filepath = filepath
             frame.tile_name = filename
             lbl.bind("<Button-1>",
                      lambda e, fn=filename, rt=region_type:
                      self._on_tile_select(fn, rt))
-        self.tile_inner.columnconfigure((0, 1, 2), weight=1)
+        self.tile_inner.columnconfigure(tuple(range(6)), weight=1)
 
     def _on_tile_select(self, filename, region_type):
         """Handle clicking a tile in the picker. Toggle selection on/off."""

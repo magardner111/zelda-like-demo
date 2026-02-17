@@ -13,6 +13,7 @@ from core.collision import (
 from core.input_manager import InputManager
 from core.player_base import Player
 
+from core.region_base import MapRegion
 from maps.map_base import MapBase
 from menus import MainMenu
 from hud import GameHud
@@ -96,6 +97,7 @@ def main():
             menu.update(input_manager)
 
             # Draw game underneath, then HUD, then menu overlay
+            MapRegion.tick_animation(dt)
             current_map.update_visibility(player)
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera, player.current_layer)
@@ -148,6 +150,7 @@ def main():
             # -----------------------------
             # Draw
             # -----------------------------
+            MapRegion.tick_animation(dt)
             current_map.update_visibility(player)
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera, player.current_layer)
