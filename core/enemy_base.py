@@ -2,26 +2,20 @@ import math
 
 import pygame
 
+from core.game_object import GameObject
+
 # Half-angle cosine for enemy sight cone (120° FOV → 60° half-angle)
 _SIGHT_COS = math.cos(math.radians(60))
 
 
-class Enemy:
+class Enemy(GameObject):
     def __init__(self, position, stats):
-        # -----------------------------
-        # Position
-        # -----------------------------
-        self.pos = pygame.Vector2(position)
+        super().__init__(position, stats)
 
         # -----------------------------
-        # Stats
+        # Enemy-specific stats
         # -----------------------------
         self.size = stats["size"]
-        self.radius = self.size
-        self.speed = stats["speed"]
-        self.max_health = stats["max_health"]
-        self.health = self.max_health
-        self.color = stats["color"]
 
         self.hit_damage = stats.get("hit_damage", 1)
 
@@ -38,26 +32,10 @@ class Enemy:
         self._last_known_player_pos = None
 
         # -----------------------------
-        # Knockback
-        # -----------------------------
-        self.vel = pygame.Vector2(0, 0)
-        self.knockback_timer = 0.0
-
-        # -----------------------------
         # Damage Flash
         # -----------------------------
         self.flash_timer = 0.0
         self.flash_duration = 0.1
-
-        # -----------------------------
-        # Layer
-        # -----------------------------
-        self.current_layer = 0
-
-        # -----------------------------
-        # Edge Slide
-        # -----------------------------
-        self._slide_vel = pygame.Vector2(0, 0)
 
         # -----------------------------
         # Visibility fade
@@ -65,22 +43,9 @@ class Enemy:
         self.visibility_alpha = 255
 
         # -----------------------------
-        # Facing
+        # Facing (Enemy default: face down)
         # -----------------------------
-        self.facing = pygame.Vector2(0, 1)  # default: face down
-
-        # -----------------------------
-        # Fall animation
-        # -----------------------------
-        self.falling = False
-        self._fall_timer = 0.0
-        self._fall_duration = stats.get("fall_duration", 0.6)
-        self._fall_speed_increase = stats.get("fall_speed_increase", 0.2)
-        self._min_fall_duration = stats.get("min_fall_duration", 0.3)
-        self._effective_fall_duration = self._fall_duration
-        self._fall_start_layer = 0
-        self._fall_target_layer = 0
-        self._fall_landed = False
+        self.facing = pygame.Vector2(0, 1)
 
         # -----------------------------
         # Pattern (None for now)
@@ -139,10 +104,7 @@ class Enemy:
                     self.pattern.start_pos = None
 
         # Knockback movement
-        if self.knockback_timer > 0:
-            self.knockback_timer -= dt
-            self.pos += self.vel * dt
-            self.vel *= 0.85
+        self._update_knockback(dt)
 
         if self.flash_timer > 0:
             self.flash_timer -= dt
@@ -190,26 +152,6 @@ class Enemy:
                 direction = direction.normalize()
                 self.vel = direction * effective_kb
                 self.knockback_timer = 0.2
-
-    # =====================================================
-    # FALL
-    # =====================================================
-
-    def start_fall(self, target_layer):
-        """Begin or extend the fall animation toward *target_layer*."""
-        if not self.falling:
-            if not self._fall_landed:
-                self._fall_start_layer = self.current_layer
-            self._fall_landed = False
-            self.falling = True
-            self._fall_timer = 0.0
-        # Update target (may extend a fall already in progress)
-        self._fall_target_layer = target_layer
-        layers_fallen = max(1, self._fall_start_layer - target_layer)
-        self._effective_fall_duration = max(
-            self._min_fall_duration,
-            self._fall_duration - self._fall_speed_increase * (layers_fallen - 1),
-        )
 
     # =====================================================
     # DRAW

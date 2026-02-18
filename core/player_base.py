@@ -1,36 +1,26 @@
 import pygame
 
+from core.game_object import GameObject
 
-class Player:
+
+class Player(GameObject):
     def __init__(self, position, stats):
-        # -----------------------------
-        # Position / Movement
-        # -----------------------------
-        self.pos = pygame.Vector2(position)
-        self.vel = pygame.Vector2(0, 0)
+        super().__init__(position, stats)
 
-        self.radius = stats["radius"]
-        self.speed = stats["speed"]
-        self.color = stats["color"]
-
+        # -----------------------------
+        # Facing line (Player-specific visual)
+        # -----------------------------
         self.facing_line_color = stats["facing_line_color"]
         self.facing_line_length = stats["facing_line_length"]
         self.facing_line_offset = stats["facing_line_offset"]
 
-        # IMPORTANT: default facing UP (matches original sword demo)
-        self.facing = pygame.Vector2(0, -1)
-
         # -----------------------------
-        # Health
+        # Invulnerability
         # -----------------------------
-        self.max_health = stats["max_health"]
-        self.health = self.max_health
-
         self.invuln_time = stats["invuln_time"]
         self.invuln_timer = 0.0
 
         self.knockback_force = stats["knockback_force"]
-        self.knockback_timer = 0.0
 
         self.invuln_freq = stats["invuln_freq"]
         self.invuln_speed = stats["invuln_speed"]
@@ -56,29 +46,6 @@ class Player:
         # -----------------------------
         self.sneak_speed_factor = stats["sneak_speed_factor"]
         self.sneaking = False
-
-        # -----------------------------
-        # Layer
-        # -----------------------------
-        self.current_layer = 0
-
-        # -----------------------------
-        # Edge Slide
-        # -----------------------------
-        self._slide_vel = pygame.Vector2(0, 0)
-
-        # -----------------------------
-        # Fall animation
-        # -----------------------------
-        self.falling = False
-        self._fall_timer = 0.0
-        self._fall_duration = stats["fall_duration"]
-        self._fall_speed_increase = stats["fall_speed_increase"]
-        self._min_fall_duration = stats["min_fall_duration"]
-        self._effective_fall_duration = self._fall_duration
-        self._fall_start_layer = 0
-        self._fall_target_layer = 0
-        self._fall_landed = False
 
         # -----------------------------
         # Awareness and Visibility
@@ -237,10 +204,7 @@ class Player:
         if self.invuln_timer > 0:
             self.invuln_timer -= dt
 
-        if self.knockback_timer > 0:
-            self.knockback_timer -= dt
-            self.pos += self.vel * dt
-            self.vel *= 0.85
+        self._update_knockback(dt)
 
         # Dodge movement
         if self.dodge_remaining > 0:
@@ -260,26 +224,6 @@ class Player:
         # Fall animation (timer only — completion handled in update)
         if self.falling:
             self._fall_timer += dt
-
-    # =====================================================
-    # FALL
-    # =====================================================
-
-    def start_fall(self, target_layer):
-        """Begin or extend the fall animation toward *target_layer*."""
-        if not self.falling:
-            if not self._fall_landed:
-                self._fall_start_layer = self.current_layer
-            self._fall_landed = False
-            self.falling = True
-            self._fall_timer = 0.0
-        # Update target (may extend a fall already in progress)
-        self._fall_target_layer = target_layer
-        layers_fallen = max(1, self._fall_start_layer - target_layer)
-        self._effective_fall_duration = max(
-            self._min_fall_duration,
-            self._fall_duration - self._fall_speed_increase * (layers_fallen - 1),
-        )
 
     # =====================================================
     # DRAW
