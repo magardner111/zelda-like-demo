@@ -57,18 +57,11 @@ class Enemy(GameObject):
     # =====================================================
 
     def update(self, dt, player, solid_regions):
-        # Fall animation tick
-        if self.falling:
-            self._fall_timer += dt
-            if self._fall_timer >= self._effective_fall_duration:
-                self.falling = False
-                self._fall_timer = 0.0
-                self.current_layer = self._fall_target_layer
-                self._fall_landed = True
-            return  # skip AI/movement while falling
-
-        if self._fall_landed:
-            self._fall_landed = False
+        # Fall / landing animation
+        if self._update_fall(dt):
+            if self.flash_timer > 0:
+                self.flash_timer -= dt
+            return  # skip AI/movement while falling/landing
 
         detected = self._detect_player(player, solid_regions)
 
@@ -174,6 +167,18 @@ class Enemy(GameObject):
             screen_pos = pygame.Vector2(camera.apply(self.pos))
             screen.blit(surf, screen_pos - pygame.Vector2(draw_size, draw_size))
             return  # skip normal drawing while falling
+
+        # Landing animation: shrink from large to normal size
+        if self.landing:
+            t = self._land_timer / self._land_duration  # 0 → 1
+            scale = 2.0 - t  # 2.0 → 1.0 (large to normal)
+            alpha = int(255 * t)
+            draw_size = max(1, int(self.size * scale))
+            surf = pygame.Surface((draw_size * 2, draw_size * 2), pygame.SRCALPHA)
+            surf.fill((*draw_color, alpha))
+            screen_pos = pygame.Vector2(camera.apply(self.pos))
+            screen.blit(surf, screen_pos - pygame.Vector2(draw_size, draw_size))
+            return  # skip normal drawing while landing
 
         rect = pygame.Rect(
             0, 0,

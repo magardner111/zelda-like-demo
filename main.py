@@ -128,6 +128,12 @@ def main():
 
             player.update(dt, input_manager, enemies_on_layer, camera, speed_factor)
 
+            # Drain pending camera shakes from all entities
+            for entity in [player] + current_map.enemies:
+                if entity._pending_shake is not None:
+                    camera.shake(*entity._pending_shake)
+                    entity._pending_shake = None
+
             # Wall collision
             resolve_entity_vs_regions(player, solid_regions)
 
