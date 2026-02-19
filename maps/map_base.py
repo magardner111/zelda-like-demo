@@ -9,6 +9,11 @@ _PI_OVER_4 = math.pi / 4
 _SLIDE_SAMPLE_DIRS = [
     (math.cos(i * _PI_OVER_4), math.sin(i * _PI_OVER_4)) for i in range(8)
 ]
+
+# Enemies beyond this distance from the player skip full AI updates each frame.
+# ~2x the screen diagonal (960x800 → diagonal ≈ 1250px).
+_ENEMY_CULL_DIST_SQ = 2500 ** 2
+
 from core.collision import resolve_entity_vs_regions
 from core.enemy_base import Enemy
 from core.floor_layer import FloorLayer
@@ -128,9 +133,20 @@ class MapBase:
         entity.pos.y = max(r, min(self.height - r, entity.pos.y))
 
     def update(self, dt, player):
+        # Cache layers to avoid O(layers) lookup per enemy
+        layer_cache = {}
+
         for enemy in self.enemies:
-            layer = self.get_layer(enemy.current_layer)
+            elev = enemy.current_layer
+            if elev not in layer_cache:
+                layer_cache[elev] = self.get_layer(elev)
+            layer = layer_cache[elev]
             solid_regions = layer.get_solid_regions() if layer else []
+
+            # Skip full AI update for enemies far off-screen (they'll resume when nearby)
+            dist_sq = (enemy.pos - player.pos).length_squared()
+            if dist_sq > _ENEMY_CULL_DIST_SQ:
+                continue
 
             enemy.update(dt, player, solid_regions)
 
@@ -268,6 +284,16 @@ class MapBase:
             key=lambda l: l.elevation,
         )
 
+        # Viewport in world-space with a small margin to avoid edge popping
+        sw, sh = screen.get_size()
+        _MARGIN = 64
+        viewport = pygame.Rect(
+            -camera.offset.x - _MARGIN,
+            -camera.offset.y - _MARGIN,
+            sw + _MARGIN * 2,
+            sh + _MARGIN * 2,
+        )
+
         current_layer = None
         for layer in layers_below:
             # Only the bottom layer fills the entire map background
@@ -281,21 +307,25 @@ class MapBase:
                 continue
 
             for region in layer.floor_regions:
-                region.draw(screen, camera)
+                if viewport.colliderect(region.rect):
+                    region.draw(screen, camera)
             for region in layer.wall_regions:
-                region.draw(screen, camera)
+                if viewport.colliderect(region.rect):
+                    region.draw(screen, camera)
 
-        # Darken lower layers where the current layer has no regions
+        # Darken lower layers where the current layer has no regions.
+        # Use a screen-sized surface — NOT map-sized — to avoid allocating a
+        # potentially enormous surface each frame on large maps.
         if view_layer > 0:
-            map_rect = pygame.Rect(0, 0, self.width, self.height)
-            screen_rect = map_rect.move(camera.offset)
-            dark = pygame.Surface((screen_rect.width, screen_rect.height), pygame.SRCALPHA)
+            dark = pygame.Surface((sw, sh), pygame.SRCALPHA)
             dark.fill((0, 0, 0, 100))
-            screen.blit(dark, screen_rect.topleft)
+            screen.blit(dark, (0, 0))
 
         # Draw current layer's floor regions on top at full brightness
         if current_layer:
             for region in current_layer.floor_regions:
+                if not viewport.colliderect(region.rect):
+                    continue
                 if isinstance(region, _ObjectRegion) and \
                         not self.is_visible(region.rect.centerx, region.rect.centery):
                     continue
@@ -324,8 +354,12 @@ class MapBase:
         """Draw wall regions on top of entities for the current layer only.
         Lower-layer walls are drawn during draw() so they sit beneath
         the current layer's floor and get the darkening overlay."""
+        sw, sh = screen.get_size()
+        viewport = pygame.Rect(-camera.offset.x - 64, -camera.offset.y - 64,
+                               sw + 128, sh + 128)
         for layer in self.floor_layers:
             if layer.elevation == view_layer:
                 for region in layer.wall_regions:
-                    region.draw(screen, camera)
+                    if viewport.colliderect(region.rect):
+                        region.draw(screen, camera)
                 break
