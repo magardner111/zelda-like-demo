@@ -173,9 +173,16 @@ def main():
             screen.fill(BACKGROUND_COLOR)
             current_map.draw(screen, camera, player.current_layer)
 
-            # Fade enemy visibility alpha and draw
+            # Fade enemy visibility alpha and draw.
+            # Skip enemies that are entirely outside the viewport — no
+            # point running point_in_polygon or drawing off-screen enemies.
+            _sw, _sh = screen.get_size()
             for enemy in current_map.enemies:
                 if enemy.current_layer != player.current_layer:
+                    continue
+                _ex, _ey = camera.apply(enemy.pos)
+                if (_ex + enemy.size < 0 or _ex - enemy.size > _sw or
+                        _ey + enemy.size < 0 or _ey - enemy.size > _sh):
                     continue
                 if current_map.is_visible(enemy.pos.x, enemy.pos.y):
                     enemy.visibility_alpha = 255

@@ -22,6 +22,18 @@ VIS_RECOMPUTE_MOVE_THRESHOLD = 5.0   # pixels
 # Keeps the polygon from going permanently stale (e.g. during a screen shake).
 VIS_RECOMPUTE_MAX_FRAMES = 6
 
+# Maximum wall search radius for compute_visibility_polygon.
+# Walls beyond this range cannot cast visible shadows from the player.
+# Reduce toward ~700 for a tighter, faster computation at the cost of
+# potentially missing shadows from distant walls through doorways.
+VIS_WALL_RANGE = 1200  # pixels
+
+# Fog-of-war overlay color used with pygame.BLEND_MULT.
+# Equivalent to a black SRCALPHA overlay with alpha=100:
+#   channel = round(255 * (1 - 100/255)) = 155
+# Raise each channel toward 255 for lighter fog; lower toward 0 for darker.
+VIS_FOG_COLOR = (155, 155, 155)
+
 from core.collision import resolve_entity_vs_regions
 from core.enemy_base import Enemy
 from core.floor_layer import FloorLayer
@@ -48,6 +60,10 @@ class MapBase:
         self._visibility_poly = None
         self._vis_last_pos = None
         self._vis_frames_since_recompute = VIS_RECOMPUTE_MAX_FRAMES  # force first frame
+        self._vis_overlay = None          # pre-allocated BLEND_MULT overlay surface
+        self._vis_overlay_poly_id = None  # id() of polygon used to fill the overlay
+        self._vis_overlay_offset = None   # (ox, oy) camera offset when overlay was drawn
+        self._dark_overlay = None         # pre-allocated BLEND_MULT surface for layer darkening
 
     @classmethod
     def from_json(cls, path):
@@ -304,9 +320,8 @@ class MapBase:
         # Only walls near the player can cast visible shadows. Filtering from
         # all walls on the layer (potentially hundreds) to those within view
         # range reduces ray count and segment count by ~10x each → ~100x faster.
-        _VIS_RANGE = 1200
-        check = pygame.Rect(px - _VIS_RANGE, py - _VIS_RANGE,
-                            _VIS_RANGE * 2, _VIS_RANGE * 2)
+        check = pygame.Rect(px - VIS_WALL_RANGE, py - VIS_WALL_RANGE,
+                            VIS_WALL_RANGE * 2, VIS_WALL_RANGE * 2)
         wall_rects = (
             [r.rect for r in layer.wall_regions if check.colliderect(r.rect)]
             if layer else []
@@ -362,12 +377,12 @@ class MapBase:
                     region.draw(screen, camera)
 
         # Darken lower layers where the current layer has no regions.
-        # Use a screen-sized surface — NOT map-sized — to avoid allocating a
-        # potentially enormous surface each frame on large maps.
+        # Pre-allocated non-SRCALPHA surface reused across frames.
         if view_layer > 0:
-            dark = pygame.Surface((sw, sh), pygame.SRCALPHA)
-            dark.fill((0, 0, 0, 100))
-            screen.blit(dark, (0, 0))
+            if self._dark_overlay is None or self._dark_overlay.get_size() != (sw, sh):
+                self._dark_overlay = pygame.Surface((sw, sh))
+                self._dark_overlay.fill(VIS_FOG_COLOR)
+            screen.blit(self._dark_overlay, (0, 0), special_flags=pygame.BLEND_MULT)
 
         # Draw current layer's floor regions on top at full brightness
         if current_layer:
@@ -384,19 +399,38 @@ class MapBase:
             stairway.draw(screen, camera, view_layer)
 
     def draw_visibility(self, screen, camera, player):
-        """Draw a dark overlay everywhere the player can't see."""
+        """Draw a dark overlay everywhere the player can't see.
+
+        Uses a non-SRCALPHA surface with pygame.BLEND_MULT instead of SRCALPHA
+        alpha-compositing. Non-SRCALPHA fill() and draw.polygon() are ~3x faster
+        because pygame doesn't need to process per-pixel alpha. The surface is
+        pre-allocated and reused; the overlay is only rebuilt when the polygon or
+        camera offset actually changes (free cache hit every frame the player
+        stands still, or between visibility recomputes).
+        """
         if self._visibility_poly is None or len(self._visibility_poly) < 3:
             return
 
-        # Convert from map coords to screen coords
-        ox, oy = camera.offset
-        screen_poly = [(x + ox, y + oy) for x, y in self._visibility_poly]
+        sz = screen.get_size()
+        # Allocate once; reuse across frames.
+        if self._vis_overlay is None or self._vis_overlay.get_size() != sz:
+            self._vis_overlay = pygame.Surface(sz)
+            self._vis_overlay_poly_id = None  # force rebuild after resize
 
-        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 100))
-        # Punch out the visible area by drawing transparent polygon
-        pygame.draw.polygon(overlay, (0, 0, 0, 0), screen_poly)
-        screen.blit(overlay, (0, 0))
+        ox, oy = int(camera.offset.x), int(camera.offset.y)
+        poly_id = id(self._visibility_poly)
+
+        # Rebuild only when the polygon or integer camera offset changes.
+        # Cache hit every frame the player is stationary.
+        if poly_id != self._vis_overlay_poly_id or (ox, oy) != self._vis_overlay_offset:
+            screen_poly = [(x + ox, y + oy) for x, y in self._visibility_poly]
+            self._vis_overlay.fill(VIS_FOG_COLOR)
+            pygame.draw.polygon(self._vis_overlay, (255, 255, 255), screen_poly)
+            self._vis_overlay_poly_id = poly_id
+            self._vis_overlay_offset = (ox, oy)
+
+        # BLEND_MULT: VIS_FOG_COLOR dims screen pixels; white leaves them unchanged.
+        screen.blit(self._vis_overlay, (0, 0), special_flags=pygame.BLEND_MULT)
 
     def draw_walls(self, screen, camera, view_layer=0):
         """Draw wall regions on top of entities for the current layer only.
