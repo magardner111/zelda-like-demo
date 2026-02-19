@@ -13,6 +13,7 @@ class Layout:
 
     def __init__(self):
         self._graph = nx.Graph()
+        self.seed = None
 
     # --- mutation ---
 
@@ -186,7 +187,7 @@ rotation_map={
 # ============================================================
 # Layout generator
 # ============================================================
-def generate_layout(n_nodes=15, min_chain=5):
+def generate_layout(n_nodes=15, min_chain=5, seed=None):
     """Generate a Layout using the grid-based algorithm.
 
     Builds a random spanning tree on a 2-D grid.  The longest leaf-to-leaf
@@ -194,6 +195,16 @@ def generate_layout(n_nodes=15, min_chain=5):
     Side branches off the backbone provide keys that lock the next corridor
     along the backbone (max 2 branches per backbone node; boss and treasure
     nodes get no branches).
+
+    Parameters
+    ----------
+    n_nodes : int
+        Target number of rooms before pruning.
+    min_chain : int
+        Minimum length of the initial backbone chain.
+    seed : int or None
+        Random seed for reproducible generation.  If None, one is chosen
+        automatically so the result is still replayable via layout.seed.
 
     Extra node attributes set on the returned Layout's graph:
         role     – "entrance" | "treasure" | "boss" | "main_path" |
@@ -206,6 +217,10 @@ def generate_layout(n_nodes=15, min_chain=5):
                           from the lower-numbered node's perspective
         unlock_criteria – None (open) or the room_id whose key unlocks it
     """
+    if seed is None:
+        seed = random.randint(0, 2**32 - 1)
+    random.seed(seed)
+
     G = generate_grid_level(n_nodes, min_chain)
 
     # --- backbone ---
@@ -264,6 +279,7 @@ def generate_layout(n_nodes=15, min_chain=5):
 
     # --- populate Layout ---
     layout = Layout()
+    layout.seed = seed
 
     for n, data in G.nodes(data=True):
         layout.add_room(n, data["pos"])

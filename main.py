@@ -15,6 +15,7 @@ from core.player_base import Player
 
 from core.region_base import MapRegion
 from maps.map_base import MapBase
+from maps import generate_layout, generate_map
 from menus import MainMenu
 from hud import GameHud
 
@@ -26,7 +27,9 @@ from data.sword_stats import SWORD_STATS
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--map", type=str, default=None,
-                        help="Path to JSON map file (default: maps/lvl1.json)")
+                        help="Path to JSON map file")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Random seed for procedural map generation")
     args = parser.parse_args()
 
     pygame.init()
@@ -57,12 +60,13 @@ def main():
     # -----------------------------
     # Load Map
     # -----------------------------
-    import os
     if args.map:
-        map_path = args.map
+        current_map = MapBase.from_json(args.map)
     else:
-        map_path = os.path.join(os.path.dirname(__file__), "maps", "lvl1.json")
-    current_map = MapBase.from_json(map_path)
+        layout = generate_layout(seed=args.seed)
+        current_map, player_start = generate_map(layout)
+        player.pos = pygame.Vector2(player_start)
+        print(f"Generated map  seed={layout.seed}")
     camera.set_bounds(current_map.width, current_map.height)
     menu = MainMenu()
     hud = GameHud(player)
