@@ -13,6 +13,7 @@ from core.collision import (
 from core.input_manager import InputManager
 from core.player_base import Player
 
+from core.game_options import GameOptions
 from core.region_base import MapRegion
 from maps.map_base import MapBase
 from maps import generate_layout, generate_map
@@ -68,8 +69,9 @@ def main():
         player.pos = pygame.Vector2(player_start)
         print(f"Generated map  seed={layout.seed}")
     camera.set_bounds(current_map.width, current_map.height)
-    menu = MainMenu()
-    hud = GameHud(player)
+    options = GameOptions()
+    menu = MainMenu(options=options)
+    hud = GameHud(player, options=options, fps_source=clock.get_fps)
 
     running = True
 

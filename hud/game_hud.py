@@ -1,5 +1,5 @@
 from settings import WIDTH, HEIGHT
-from core.hud_base import HudLayer, HudContainer, HudBar
+from core.hud_base import HudLayer, HudContainer, HudBar, HudText
 
 # Pixels of bar width per unit of max stat
 HP_BAR_SCALE = 10
@@ -12,8 +12,9 @@ class GameHud(HudLayer):
     Binds UI elements to player/game data via callables passed at construction.
     """
 
-    def __init__(self, player):
+    def __init__(self, player, options=None, fps_source=None):
         super().__init__()
+        self._options = options
 
         container_height = HEIGHT // 8
         padding = 10
@@ -52,3 +53,21 @@ class GameHud(HudLayer):
             border_color=(180, 180, 180),
             border_width=1,
         ))
+
+        # FPS counter — top-right corner, inside the top bar
+        if fps_source is not None:
+            self._fps_text = top_bar.add(HudText(
+                position=(WIDTH - 90, padding),
+                text_source=lambda: f"{fps_source():.0f} fps",
+                color=(220, 220, 100),
+                font_size=24,
+            ))
+        else:
+            self._fps_text = None
+
+    def draw(self, screen):
+        if self._fps_text is not None:
+            self._fps_text.visible = (
+                self._options is None or self._options.show_fps
+            )
+        super().draw(screen)
