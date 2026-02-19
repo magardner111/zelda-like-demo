@@ -14,6 +14,14 @@ _SLIDE_SAMPLE_DIRS = [
 # ~2x the screen diagonal (960x800 → diagonal ≈ 1250px).
 _ENEMY_CULL_DIST_SQ = 2500 ** 2
 
+# Visibility polygon recomputation throttling.
+# Skip recompute when the player has moved less than this many pixels since the
+# last computation. Larger values = fewer recomputes but slightly staler shadows.
+VIS_RECOMPUTE_MOVE_THRESHOLD = 5.0   # pixels
+# Hard cap: always recompute after this many frames even if the player is still.
+# Keeps the polygon from going permanently stale (e.g. during a screen shake).
+VIS_RECOMPUTE_MAX_FRAMES = 6
+
 from core.collision import resolve_entity_vs_regions
 from core.enemy_base import Enemy
 from core.floor_layer import FloorLayer
@@ -38,6 +46,8 @@ class MapBase:
         self.floor_layers = []
         self.stairways = []
         self._visibility_poly = None
+        self._vis_last_pos = None
+        self._vis_frames_since_recompute = VIS_RECOMPUTE_MAX_FRAMES  # force first frame
 
     @classmethod
     def from_json(cls, path):
@@ -273,7 +283,22 @@ class MapBase:
         """Compute and cache the visibility polygon for the current frame."""
         if not player.limit_view:
             self._visibility_poly = None
+            self._vis_last_pos = None
+            self._vis_frames_since_recompute = VIS_RECOMPUTE_MAX_FRAMES
             return
+
+        self._vis_frames_since_recompute += 1
+
+        # Skip recompute if the player hasn't moved enough and the hard frame
+        # cap hasn't been reached. Reuses the previous polygon instead.
+        moved_sq = (
+            (player.pos - self._vis_last_pos).length_squared()
+            if self._vis_last_pos is not None else float("inf")
+        )
+        if (moved_sq < VIS_RECOMPUTE_MOVE_THRESHOLD ** 2
+                and self._vis_frames_since_recompute < VIS_RECOMPUTE_MAX_FRAMES):
+            return
+
         layer = self.get_layer(player.current_layer)
         px, py = player.pos.x, player.pos.y
         # Only walls near the player can cast visible shadows. Filtering from
@@ -289,6 +314,8 @@ class MapBase:
         self._visibility_poly = compute_visibility_polygon(
             (px, py), wall_rects, self.width, self.height,
         )
+        self._vis_last_pos = pygame.Vector2(player.pos)
+        self._vis_frames_since_recompute = 0
 
     def is_visible(self, x, y):
         """Check if a map-space point is inside the cached visibility polygon."""
