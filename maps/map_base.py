@@ -133,24 +133,36 @@ class MapBase:
         entity.pos.y = max(r, min(self.height - r, entity.pos.y))
 
     def update(self, dt, player):
-        # Cache layers to avoid O(layers) lookup per enemy
+        # Cache layers and solid region lists to avoid redundant work per enemy.
         layer_cache = {}
+        solid_cache = {}   # elev -> full solid region list for that layer
 
         for enemy in self.enemies:
             elev = enemy.current_layer
             if elev not in layer_cache:
                 layer_cache[elev] = self.get_layer(elev)
             layer = layer_cache[elev]
-            solid_regions = layer.get_solid_regions() if layer else []
+            if elev not in solid_cache:
+                solid_cache[elev] = layer.get_solid_regions() if layer else []
+            all_solid = solid_cache[elev]
 
             # Skip full AI update for enemies far off-screen (they'll resume when nearby)
             dist_sq = (enemy.pos - player.pos).length_squared()
             if dist_sq > _ENEMY_CULL_DIST_SQ:
                 continue
 
-            enemy.update(dt, player, solid_regions)
+            # enemy.update needs the full solid list for line-of-sight detection
+            # (sneak mechanic). resolve_entity_vs_regions only needs walls the
+            # enemy is actually touching, so filter tightly to cut O(all_walls)
+            # collision checks to O(~4 nearby walls).
+            enemy.update(dt, player, all_solid)
 
-            resolve_entity_vs_regions(enemy, solid_regions)
+            er = enemy.radius + 4
+            ex, ey = enemy.pos.x, enemy.pos.y
+            solid_near = [r for r in all_solid
+                          if r.rect.left - er < ex < r.rect.right + er
+                          and r.rect.top - er < ey < r.rect.bottom + er]
+            resolve_entity_vs_regions(enemy, solid_near)
 
             self.clamp_entity(enemy)
 
@@ -263,10 +275,19 @@ class MapBase:
             self._visibility_poly = None
             return
         layer = self.get_layer(player.current_layer)
-        wall_rects = [r.rect for r in layer.wall_regions] if layer else []
+        px, py = player.pos.x, player.pos.y
+        # Only walls near the player can cast visible shadows. Filtering from
+        # all walls on the layer (potentially hundreds) to those within view
+        # range reduces ray count and segment count by ~10x each → ~100x faster.
+        _VIS_RANGE = 1200
+        check = pygame.Rect(px - _VIS_RANGE, py - _VIS_RANGE,
+                            _VIS_RANGE * 2, _VIS_RANGE * 2)
+        wall_rects = (
+            [r.rect for r in layer.wall_regions if check.colliderect(r.rect)]
+            if layer else []
+        )
         self._visibility_poly = compute_visibility_polygon(
-            (player.pos.x, player.pos.y), wall_rects,
-            self.width, self.height,
+            (px, py), wall_rects, self.width, self.height,
         )
 
     def is_visible(self, x, y):

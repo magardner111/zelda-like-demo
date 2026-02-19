@@ -140,8 +140,14 @@ def main():
                     camera.shake(*entity._pending_shake)
                     entity._pending_shake = None
 
-            # Wall collision
-            resolve_entity_vs_regions(player, solid_regions)
+            # Wall collision — filter to walls near the player so we don't
+            # run O(all_walls) checks against the entire map each frame.
+            pr = player.radius + 4
+            px, py = player.pos.x, player.pos.y
+            solid_near = [r for r in solid_regions
+                          if r.rect.left - pr < px < r.rect.right + pr
+                          and r.rect.top - pr < py < r.rect.bottom + pr]
+            resolve_entity_vs_regions(player, solid_near)
 
             current_map.clamp_entity(player)
 
