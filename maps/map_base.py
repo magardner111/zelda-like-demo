@@ -24,9 +24,10 @@ VIS_RECOMPUTE_MAX_FRAMES = 6
 
 # Maximum wall search radius for compute_visibility_polygon.
 # Walls beyond this range cannot cast visible shadows from the player.
-# Reduce toward ~700 for a tighter, faster computation at the cost of
-# potentially missing shadows from distant walls through doorways.
-VIS_WALL_RANGE = 1200  # pixels
+# The screen is 960×800, so ~700 px covers the full viewport plus margin.
+# Increase if shadows from distant walls (e.g. through long doorways) are
+# clipped; decrease for more rooms-in-range to shrink the wall set further.
+VIS_WALL_RANGE = 700  # pixels
 
 # Fog-of-war overlay color used with pygame.BLEND_MULT.
 # Equivalent to a black SRCALPHA overlay with alpha=100:

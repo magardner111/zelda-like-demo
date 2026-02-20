@@ -8,24 +8,33 @@ def compute_visibility_polygon(player_pos, wall_rects, map_width, map_height):
     """
     px, py = player_pos
 
-    # Collect all wall segments
+    # Collect wall segments — backface culling: only add faces that face toward
+    # the player.  Back-facing segments are never the closest ray hit for an
+    # external player position (the front face is always closer), so they add
+    # only wasted work.  This halves both segment count and corner/ray count,
+    # giving ~4x speedup in the inner O(rays × segments) loop.
     segments = []
+    points = set()
     for r in wall_rects:
         x, y, w, h = r.x, r.y, r.width, r.height
-        corners = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
-        for i in range(4):
-            segments.append((corners[i], corners[(i + 1) % 4]))
+        x2, y2 = x + w, y + h
+        if py <= y:        # player above → top face
+            segments.append(((x, y), (x2, y)))
+            points.add((x, y)); points.add((x2, y))
+        if py >= y2:       # player below → bottom face
+            segments.append(((x, y2), (x2, y2)))
+            points.add((x, y2)); points.add((x2, y2))
+        if px <= x:        # player left → left face
+            segments.append(((x, y), (x, y2)))
+            points.add((x, y)); points.add((x, y2))
+        if px >= x2:       # player right → right face
+            segments.append(((x2, y), (x2, y2)))
+            points.add((x2, y)); points.add((x2, y2))
 
     # Map boundary segments
     boundary_corners = [(0, 0), (map_width, 0), (map_width, map_height), (0, map_height)]
     for i in range(4):
         segments.append((boundary_corners[i], boundary_corners[(i + 1) % 4]))
-
-    # Collect unique corner points to cast rays toward
-    points = set()
-    for r in wall_rects:
-        x, y, w, h = r.x, r.y, r.width, r.height
-        points.update([(x, y), (x + w, y), (x + w, y + h), (x, y + h)])
     points.update(boundary_corners)
 
     # Cast rays: for each corner, cast 3 rays (corner angle ± tiny offset)
