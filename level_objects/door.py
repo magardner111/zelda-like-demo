@@ -12,7 +12,7 @@ class Door(LevelObject):
     STATE_OPENING = "opening"
     STATE_OPEN = "open"
 
-    def __init__(self, position, orientation="north"):
+    def __init__(self, position, orientation="north", connected_rooms=None):
         """Create a swinging door.
 
         Parameters
@@ -21,6 +21,8 @@ class Door(LevelObject):
             (x, y) position in world coordinates (center of doorway)
         orientation : str
             Which wall the door is on: "north", "south", "east", "west"
+        connected_rooms : tuple, optional
+            (room_id_1, room_id_2) - the two rooms this door connects
         """
         # Door dimensions based on orientation
         if orientation in ("north", "south"):
@@ -33,6 +35,7 @@ class Door(LevelObject):
         self.orientation = orientation
         self.door_width = width
         self.door_height = height
+        self.connected_rooms = connected_rooms or ()
 
         # Visual properties
         self.door_color = (101, 67, 33)  # Brown wood color
@@ -45,6 +48,7 @@ class Door(LevelObject):
         self.target_angle = 0.0
         self.swing_speed = 300.0  # degrees per second
         self.swing_direction = 1  # 1 for clockwise, -1 for counter-clockwise
+        self.just_opened = False  # Set to True when door finishes opening
 
         # Determine hinge position based on orientation
         # Hinge is on the side closest to the wall
@@ -148,6 +152,7 @@ class Door(LevelObject):
                 self.swing_angle = self.target_angle
                 self.state = self.STATE_OPEN
                 self.solid = False  # Door stays visible but non-solid
+                self.just_opened = True  # Flag for map to reveal connected rooms
 
         elif self.state == self.STATE_CLOSED:
             self.swing_angle = 0.0

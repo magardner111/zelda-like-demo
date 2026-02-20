@@ -104,11 +104,13 @@ def generate_map(layout: Layout):
         #                     (y increases downward in screen space)
         #   "south" dy=-1  → top wall     (y = ry)
         open_dirs = set()
+        neighbor_rooms = {}  # direction -> neighbor room_id
         for nbr in layout.neighbors(room_id):
             ngx, ngy = layout.get_pos(nbr)
             d = get_direction((gx, gy), (ngx, ngy))
             if d:
                 open_dirs.add(d)
+                neighbor_rooms[d] = nbr
 
         # floor — full room
         layer.add_floor_region(
@@ -136,7 +138,8 @@ def generate_map(layout: Layout):
         # (south and west doors are added by the neighboring rooms)
         for direction in open_dirs:
             if direction in ("north", "east"):
-                add_door_to_doorway(map_obj, rx, ry, direction)
+                neighbor_id = neighbor_rooms.get(direction)
+                add_door_to_doorway(map_obj, rx, ry, direction, room_id, neighbor_id)
 
         # --- room contents based on layout role ---
         role = layout.graph.nodes[room_id].get("role", RoomRole.NORMAL)
@@ -174,7 +177,7 @@ def generate_map(layout: Layout):
     return map_obj, player_start
 
 
-def add_door_to_doorway(map_obj, room_x, room_y, direction):
+def add_door_to_doorway(map_obj, room_x, room_y, direction, room_id=None, neighbor_id=None):
     """Add a Door object at the specified doorway.
 
     Parameters
@@ -185,6 +188,10 @@ def add_door_to_doorway(map_obj, room_x, room_y, direction):
         Top-left pixel coordinates of the room.
     direction : str
         Cardinal direction of the doorway: "north", "south", "east", "west".
+    room_id : int, optional
+        ID of the room the door is in
+    neighbor_id : int, optional
+        ID of the neighboring room the door connects to
     """
     door_center_x = 0
     door_center_y = 0
@@ -203,5 +210,6 @@ def add_door_to_doorway(map_obj, room_x, room_y, direction):
         door_center_x = room_x + WALL_THICKNESS // 2
         door_center_y = room_y + ROOM_SIZE // 2
 
-    door = Door((door_center_x, door_center_y), orientation=direction)
+    door = Door((door_center_x, door_center_y), orientation=direction,
+                connected_rooms=(room_id, neighbor_id))
     map_obj.add_level_object(door)

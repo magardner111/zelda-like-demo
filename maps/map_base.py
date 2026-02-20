@@ -200,6 +200,14 @@ class MapBase:
         for obj in self.level_objects:
             obj.update(dt)
 
+            # Check if any doors just opened and reveal connected rooms
+            if hasattr(obj, 'just_opened') and obj.just_opened:
+                obj.just_opened = False
+                if hasattr(obj, 'connected_rooms') and obj.connected_rooms:
+                    for room_id in obj.connected_rooms:
+                        if room_id is not None:
+                            self.visited_rooms.add(room_id)
+
         # Cache layers and solid region lists to avoid redundant work per enemy.
         layer_cache = {}
         solid_cache = {}   # elev -> full solid region list for that layer
