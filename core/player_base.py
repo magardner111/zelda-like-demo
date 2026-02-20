@@ -208,6 +208,8 @@ class Player(GameObject):
         if self.sneak_attack_timer > 0:
             self.sneak_attack_timer -= dt
 
+        self._update_speech(dt)
+
 
     # =====================================================
     # DRAW
@@ -273,3 +275,5 @@ class Player(GameObject):
         # Draw Projectiles
         for p in self.projectiles:
             p.draw(screen, camera)
+
+        self._draw_speech(screen, camera)

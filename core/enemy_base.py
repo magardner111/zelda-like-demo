@@ -61,6 +61,7 @@ class Enemy(GameObject):
         if self._update_fall(dt):
             if self.flash_timer > 0:
                 self.flash_timer -= dt
+            self._update_speech(dt)
             return  # skip AI/movement while falling/landing
 
         detected = self._detect_player(player, solid_regions)
@@ -101,6 +102,8 @@ class Enemy(GameObject):
 
         if self.flash_timer > 0:
             self.flash_timer -= dt
+
+        self._update_speech(dt)
 
     # =====================================================
     # DETECTION
@@ -199,6 +202,8 @@ class Enemy(GameObject):
         screen_pos = pygame.Vector2(camera.apply(self.pos))
         line_end = screen_pos + self.facing * self.size
         pygame.draw.line(screen, (255, 0, 0), screen_pos, line_end, 2)
+
+        self._draw_speech(screen, camera)
 
 
 def _line_clear(x1, y1, x2, y2, regions):

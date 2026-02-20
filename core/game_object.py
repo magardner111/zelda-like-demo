@@ -1,5 +1,7 @@
 import pygame
 
+from core.speech_bubble import SpeechBubble
+
 
 class GameObject:
     def __init__(self, position, stats):
@@ -41,6 +43,13 @@ class GameObject:
         # Stairway cooldown (set externally by map_base)
         # -----------------------------
         self._stairway_cooldown = False
+
+        # -----------------------------
+        # Speech bubble
+        # -----------------------------
+        # Override self._speech = SpeechBubble(...) in a subclass __init__
+        # to configure per-character appearance (color, speed, size, etc.).
+        self._speech = SpeechBubble()
 
         # -----------------------------
         # Fall animation
@@ -133,3 +142,17 @@ class GameObject:
             return True
 
         return False
+
+    # =====================================================
+    # SPEECH
+    # =====================================================
+
+    def say(self, strings):
+        """Queue a list of speech strings for word-by-word display above this entity."""
+        self._speech.say(strings)
+
+    def _update_speech(self, dt):
+        self._speech.update(dt, self.pos)
+
+    def _draw_speech(self, screen, camera):
+        self._speech.draw(screen, camera, self.pos, self.radius)

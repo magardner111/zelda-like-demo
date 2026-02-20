@@ -1,6 +1,7 @@
 import random
 
 from core.enemy_base import Enemy
+from enemies.annoying_kid import AnnoyingKid
 from core.floor_layer import FloorLayer
 from core.region_base import FloorRegion, ObjectRegion, WallRegion
 from data.enemy_stats import ENEMY_STATS
@@ -165,6 +166,17 @@ def generate_map(layout: Layout):
         elif role == RoomRole.BOSS:
             enemy = Enemy((cx, cy), ENEMY_STATS["lvl1enemy"])
             map_obj.enemies.append(enemy)
+
+    # --- annoying kid: spawn in one random side-loot room ---
+    side_loot_rooms = [
+        n for n in layout.rooms()
+        if layout.graph.nodes[n].get("role") == RoomRole.SIDE_LOOT
+    ]
+    if side_loot_rooms:
+        chosen = random.choice(side_loot_rooms)
+        rx, ry, rw, rh = map_obj.room_bounds[chosen]
+        kid_pos = (rx + rw // 2, ry + rh // 2)
+        map_obj.enemies.append(AnnoyingKid(kid_pos, ENEMY_STATS["annoying_kid"]))
 
     # --- player start: centre of the entrance room ---
     entrance_id = next(
