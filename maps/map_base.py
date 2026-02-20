@@ -208,6 +208,20 @@ class MapBase:
                         if room_id is not None:
                             self.visited_rooms.add(room_id)
 
+            # Check if any doors impacted (bounce off wall) - shake camera and alert enemies
+            if hasattr(obj, 'impact_this_frame') and obj.impact_this_frame:
+                # Queue camera shake (will be consumed by main loop)
+                player._pending_shake = (0.1, 8)
+
+                # Alert nearby enemies
+                alert_radius = 300  # pixels
+                for enemy in self.enemies:
+                    dist_sq = (enemy.pos - obj.pos).length_squared()
+                    if dist_sq < alert_radius ** 2:
+                        # Make enemy aware/alert (set their aggro state if they have one)
+                        if hasattr(enemy, 'alerted'):
+                            enemy.alerted = True
+
         # Cache layers and solid region lists to avoid redundant work per enemy.
         layer_cache = {}
         solid_cache = {}   # elev -> full solid region list for that layer

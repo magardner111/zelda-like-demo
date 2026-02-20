@@ -76,8 +76,11 @@ class Player(GameObject):
     # UPDATE
     # =====================================================
 
-    def update(self, dt, input_manager, enemies, camera, speed_factor=1.0):
+    def update(self, dt, input_manager, enemies, camera, speed_factor=1.0, level_objects=None):
         self._update_timers(dt)
+
+        if level_objects is None:
+            level_objects = []
 
         sword = self.weapons.get("sword")
         arrow = self.weapons.get("arrow")
@@ -121,7 +124,7 @@ class Player(GameObject):
         # Weapon Updates
         # -----------------------------
         if sword:
-            sword.update(dt, enemies)
+            sword.update(dt, enemies, level_objects)
 
         if arrow:
             arrow.update(dt)

@@ -134,7 +134,7 @@ def main():
                 if e.current_layer == player.current_layer
             ]
 
-            player.update(dt, input_manager, enemies_on_layer, camera, speed_factor)
+            player.update(dt, input_manager, enemies_on_layer, camera, speed_factor, current_map.level_objects)
 
             # Mark current room as visited for fog of war
             current_map.mark_current_room_visited(player)

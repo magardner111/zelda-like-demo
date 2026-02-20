@@ -18,8 +18,11 @@ class LevelObject:
 
     def overlaps_circle(self, pos, radius):
         """Circle-vs-rect overlap test (same as MapRegion)."""
-        closest_x = max(self.rect.left, min(pos.x, self.rect.right))
-        closest_y = max(self.rect.top, min(pos.y, self.rect.bottom))
+        # Use rotated rect if object provides one (e.g., doors)
+        check_rect = self.get_collision_rect() if hasattr(self, 'get_collision_rect') else self.rect
+
+        closest_x = max(check_rect.left, min(pos.x, check_rect.right))
+        closest_y = max(check_rect.top, min(pos.y, check_rect.bottom))
         dist_sq = (pos.x - closest_x) ** 2 + (pos.y - closest_y) ** 2
         return dist_sq < radius ** 2
 

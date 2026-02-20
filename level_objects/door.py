@@ -45,10 +45,17 @@ class Door(LevelObject):
         # Animation state
         self.state = self.STATE_CLOSED
         self.swing_angle = 0.0  # Current rotation angle (0 = closed, 90 = open)
+        self.angular_velocity = 0.0  # degrees per second (physics-based)
         self.target_angle = 0.0
-        self.swing_speed = 300.0  # degrees per second
+        self.swing_speed = 300.0  # degrees per second (for touch-to-open)
         self.swing_direction = 1  # 1 for clockwise, -1 for counter-clockwise
         self.just_opened = False  # Set to True when door finishes opening
+
+        # Physics properties
+        self.max_angle = 100.0  # Can swing past 90 degrees
+        self.bounce_factor = 0.6  # How much velocity is retained on bounce
+        self.friction = 0.95  # Velocity multiplier per frame (damping)
+        self.impact_threshold = 50.0  # Min velocity for impact effects (camera shake)
 
         # Determine hinge position based on orientation
         # Hinge is on the side closest to the wall
@@ -83,6 +90,24 @@ class Door(LevelObject):
 
         self.state = self.STATE_OPENING
         self.target_angle = 90.0
+
+    def apply_force(self, angular_impulse):
+        """Apply an angular impulse to the door (e.g., from sword hit).
+
+        Parameters
+        ----------
+        angular_impulse : float
+            Angular velocity to add (degrees per second)
+        """
+        # Determine swing direction if door is closed
+        if self.state == self.STATE_CLOSED:
+            # Set direction based on sign of impulse, or use default
+            if angular_impulse != 0:
+                self.swing_direction = 1 if angular_impulse > 0 else -1
+            self.state = self.STATE_OPENING
+
+        # Add to angular velocity (physics-based swinging)
+        self.angular_velocity += angular_impulse * self.swing_direction
 
     def get_visibility_rect(self):
         """Get the axis-aligned bounding box of the door in its current rotation.
@@ -137,29 +162,63 @@ class Door(LevelObject):
         return pygame.Rect(int(min_x), int(min_y),
                           int(max_x - min_x), int(max_y - min_y))
 
+    def get_collision_rect(self):
+        """Get the rect used for player collision (same as visibility rect)."""
+        return self.get_visibility_rect()
+
     def update(self, dt):
-        """Update door swing animation."""
-        if self.state == self.STATE_OPENING:
-            # Animate swing
-            if abs(self.swing_angle - self.target_angle) > 0.1:
-                delta = self.swing_speed * dt
-                if self.swing_angle < self.target_angle:
-                    self.swing_angle = min(self.swing_angle + delta, self.target_angle)
-                else:
-                    self.swing_angle = max(self.swing_angle - delta, self.target_angle)
+        """Update door swing animation with physics."""
+        self.impact_this_frame = False  # Reset impact flag
+
+        if self.state == self.STATE_OPENING or self.state == self.STATE_OPEN:
+            # Physics-based swinging with angular velocity
+            if abs(self.angular_velocity) > 0.1:
+                # Update angle based on velocity
+                self.swing_angle += self.angular_velocity * dt
+
+                # Apply friction/damping
+                self.angular_velocity *= self.friction
+
+                # Bounce off max angle
+                if self.swing_angle >= self.max_angle:
+                    self.swing_angle = self.max_angle
+                    self.angular_velocity = -self.angular_velocity * self.bounce_factor
+
+                    # Impact effect if bouncing hard enough
+                    if abs(self.angular_velocity) > self.impact_threshold:
+                        self.impact_this_frame = True
+
+                # Bounce off closed position
+                elif self.swing_angle <= 0:
+                    self.swing_angle = 0
+                    self.angular_velocity = -self.angular_velocity * self.bounce_factor
+
+                    if abs(self.angular_velocity) > self.impact_threshold:
+                        self.impact_this_frame = True
+
+                # Check if door reached open position for first time
+                if self.swing_angle >= 90.0 and not self.just_opened:
+                    self.just_opened = True
+                    self.state = self.STATE_OPEN
+
             else:
-                # Finished opening
-                self.swing_angle = self.target_angle
-                self.state = self.STATE_OPEN
-                self.solid = False  # Door stays visible but non-solid
-                self.just_opened = True  # Flag for map to reveal connected rooms
+                # No velocity - use simple animation for touch-to-open
+                if abs(self.swing_angle - self.target_angle) > 0.1:
+                    delta = self.swing_speed * dt
+                    if self.swing_angle < self.target_angle:
+                        self.swing_angle = min(self.swing_angle + delta, self.target_angle)
+                    else:
+                        self.swing_angle = max(self.swing_angle - delta, self.target_angle)
+                else:
+                    # Finished opening
+                    self.swing_angle = self.target_angle
+                    self.state = self.STATE_OPEN
+                    if not self.just_opened:
+                        self.just_opened = True
 
         elif self.state == self.STATE_CLOSED:
             self.swing_angle = 0.0
-            self.solid = True
-
-        elif self.state == self.STATE_OPEN:
-            self.solid = False
+            self.angular_velocity = 0.0
 
     def draw(self, screen, camera):
         """Draw the swinging door."""

@@ -59,11 +59,14 @@ class Sword:
     # UPDATE
     # =====================================================
 
-    def update(self, dt, enemies):
+    def update(self, dt, enemies, level_objects=None):
         """
         Update sword animation and check collisions.
         enemies: list of Enemy instances
+        level_objects: list of level objects (doors, etc.)
         """
+        if level_objects is None:
+            level_objects = []
         if not self.active:
             return
 
@@ -85,6 +88,7 @@ class Sword:
 
         # Collision (single hit per swing)
         if not self.hit_this_swing:
+            # Check enemy hits
             for enemy in enemies:
                 if self._tip_hits_enemy(tip, enemy):
                     damage = self.damage
@@ -95,6 +99,18 @@ class Sword:
                     enemy.take_damage(damage, self.owner.pos, self.knockback)
                     self.hit_this_swing = True
                     break
+
+            # Check door hits (apply force to swing door open)
+            if not self.hit_this_swing:
+                for obj in level_objects:
+                    if hasattr(obj, 'apply_force') and obj.active:
+                        # Check if sword tip hits door's collision rect
+                        collision_rect = obj.get_collision_rect() if hasattr(obj, 'get_collision_rect') else obj.rect
+                        if collision_rect.collidepoint(int(tip.x), int(tip.y)):
+                            # Apply angular impulse to door
+                            obj.apply_force(600.0)  # degrees per second
+                            self.hit_this_swing = True
+                            break
 
         # End swing
         if self.timer <= 0:
