@@ -12,8 +12,21 @@ class Door(LevelObject):
     STATE_OPENING = "opening"
     STATE_OPEN = "open"
 
-    def __init__(self, position, image_path=None):
+    def __init__(self, position, orientation="north", image_path=None):
+        """Create a door.
+
+        Parameters
+        ----------
+        position : tuple
+            (x, y) position in world coordinates
+        orientation : str
+            Direction the door faces: "north", "south", "east", "west"
+        image_path : str, optional
+            Path to custom door sprite sheet
+        """
         super().__init__(position, size=(64, 64))
+
+        self.orientation = orientation
 
         # Load door sprite sheet (3 frames: closed, opening, open)
         if image_path is None:
@@ -31,6 +44,11 @@ class Door(LevelObject):
             frame = sprite_sheet.subsurface(
                 pygame.Rect(i * frame_width, 0, frame_width, frame_width)
             )
+
+            # Rotate frames for vertical doors (east/west walls)
+            if orientation in ("east", "west"):
+                frame = pygame.transform.rotate(frame, 90)
+
             self.frames.append(frame)
 
         # Animation state

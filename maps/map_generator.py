@@ -131,6 +131,10 @@ def generate_map(layout: Layout):
         for rect in _vwall_rects(rx + ROOM_SIZE - WALL_THICKNESS, ry, "east" in open_dirs):
             layer.add_wall_region(WallRegion(rect, wall_stats))
 
+        # --- add doors to doorways ---
+        for direction in open_dirs:
+            add_door_to_doorway(map_obj, rx, ry, direction)
+
         # --- room contents based on layout role ---
         role = layout.graph.nodes[room_id].get("role", RoomRole.NORMAL)
         cx, cy = rx + ROOM_SIZE // 2, ry + ROOM_SIZE // 2
@@ -195,5 +199,5 @@ def add_door_to_doorway(map_obj, room_x, room_y, direction):
         door_center_x = room_x + WALL_THICKNESS // 2
         door_center_y = room_y + ROOM_SIZE // 2
 
-    door = Door((door_center_x, door_center_y))
+    door = Door((door_center_x, door_center_y), orientation=direction)
     map_obj.add_level_object(door)
