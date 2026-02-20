@@ -65,15 +65,9 @@ class Door(LevelObject):
         self._setup_hinge()
 
     def _setup_hinge(self):
-        """Set up hinge point - fixed at left/top edge."""
-        if self.orientation == "north":  # Bottom wall, hinge on left
-            self.hinge_offset = (-self.door_width / 2, 0)
-        elif self.orientation == "south":  # Top wall, hinge on left
-            self.hinge_offset = (-self.door_width / 2, 0)
-        elif self.orientation == "east":  # Right wall, hinge on top
-            self.hinge_offset = (0, -self.door_height / 2)
-        elif self.orientation == "west":  # Left wall, hinge on top
-            self.hinge_offset = (0, -self.door_height / 2)
+        """Set up hinge point - at center of doorway (door's position)."""
+        # Hinge is exactly in the middle of the doorway, at the door's center position
+        self.hinge_offset = (0, 0)
 
     def on_player_touch(self, player):
         """Door swings away from player like pushing a door open."""
@@ -84,15 +78,17 @@ class Door(LevelObject):
         dx = player.pos.x - self.pos.x
         dy = player.pos.y - self.pos.y
 
-        # Set swing direction so door moves away from player
-        # Hinge is on left/top, so we need to determine rotation direction
-        if self.orientation in ("north", "south"):  # Horizontal door, hinge on left
-            # Player on left -> swing right (positive)
-            # Player on right -> swing left (negative)
+        # Door swings away from player
+        # Hinge is at center, door extends to one side, rotation swings it away
+        if self.orientation in ("north", "south"):  # Horizontal door
+            # Door extends left from hinge
+            # Player on left (north) -> swing right/clockwise (positive) to move away
+            # Player on right (south) -> swing left/counter-clockwise (negative) to move away
             self.swing_direction = 1 if dx < 0 else -1
-        else:  # Vertical door, hinge on top
-            # Player above -> swing down (positive)
-            # Player below -> swing up (negative)
+        else:  # Vertical door
+            # Door extends up from hinge
+            # Player above (west/left) -> swing down/clockwise (positive) to move away
+            # Player below (east/right) -> swing up/counter-clockwise (negative) to move away
             self.swing_direction = 1 if dy < 0 else -1
 
         self.state = self.STATE_OPENING
@@ -112,10 +108,10 @@ class Door(LevelObject):
             dx = source_pos.x - self.pos.x
             dy = source_pos.y - self.pos.y
 
-            # Set swing direction so door moves away from player
-            if self.orientation in ("north", "south"):  # Horizontal door, hinge on left
+            # Door swings away from player
+            if self.orientation in ("north", "south"):  # Horizontal door
                 self.swing_direction = 1 if dx < 0 else -1
-            else:  # Vertical door, hinge on top
+            else:  # Vertical door
                 self.swing_direction = 1 if dy < 0 else -1
 
             self.state = self.STATE_OPENING
@@ -267,25 +263,24 @@ class Door(LevelObject):
         hinge_screen = camera.apply(pygame.Vector2(hinge_world))
 
         # Calculate the four corners of the door rectangle before rotation
+        # Door extends from hinge (at center) in one direction
         if self.orientation in ("north", "south"):
-            # Horizontal door
-            half_w = self.door_width / 2
+            # Horizontal door - extends left from hinge at center
             half_h = self.door_height / 2
             corners = [
-                (-half_w, -half_h),  # Top-left
-                (half_w, -half_h),   # Top-right
-                (half_w, half_h),    # Bottom-right
-                (-half_w, half_h)    # Bottom-left
+                (-self.door_width, -half_h),  # Far left top
+                (0, -half_h),                  # Hinge top
+                (0, half_h),                   # Hinge bottom
+                (-self.door_width, half_h)    # Far left bottom
             ]
         else:
-            # Vertical door
+            # Vertical door - extends up from hinge at center
             half_w = self.door_width / 2
-            half_h = self.door_height / 2
             corners = [
-                (-half_w, -half_h),
-                (half_w, -half_h),
-                (half_w, half_h),
-                (-half_w, half_h)
+                (-half_w, -self.door_height),  # Top left
+                (half_w, -self.door_height),   # Top right
+                (half_w, 0),                    # Hinge right
+                (-half_w, 0)                    # Hinge left
             ]
 
         # Apply rotation around hinge point
