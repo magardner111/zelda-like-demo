@@ -65,18 +65,44 @@ class Door(LevelObject):
         self._setup_hinge()
 
     def _setup_hinge(self):
-        """Set up hinge point based on door orientation."""
-        if self.orientation == "north":  # Bottom wall, hinge on left
+        """Set up default hinge point (will be updated based on player position)."""
+        # Default hinge positions - will be updated when door is opened
+        if self.orientation == "north":  # Bottom wall, hinge on left by default
             self.hinge_offset = (-self.door_width / 2, 0)
-        elif self.orientation == "south":  # Top wall, hinge on left
+        elif self.orientation == "south":  # Top wall, hinge on left by default
             self.hinge_offset = (-self.door_width / 2, 0)
-        elif self.orientation == "east":  # Right wall, hinge on top
+        elif self.orientation == "east":  # Right wall, hinge on top by default
             self.hinge_offset = (0, -self.door_height / 2)
-        elif self.orientation == "west":  # Left wall, hinge on top
+        elif self.orientation == "west":  # Left wall, hinge on top by default
             self.hinge_offset = (0, -self.door_height / 2)
 
+    def _set_hinge_for_player_side(self, dx, dy):
+        """Set hinge position on player's side of doorway so door swings away.
+
+        Parameters
+        ----------
+        dx : float
+            Player X position relative to door
+        dy : float
+            Player Y position relative to door
+        """
+        if self.orientation in ("north", "south"):  # Horizontal door
+            # Player on left -> hinge on left, swing right
+            # Player on right -> hinge on right, swing left
+            if dx < 0:  # Player on left
+                self.hinge_offset = (-self.door_width / 2, 0)
+            else:  # Player on right
+                self.hinge_offset = (self.door_width / 2, 0)
+        else:  # Vertical door (east, west)
+            # Player above -> hinge on top, swing down
+            # Player below -> hinge on bottom, swing up
+            if dy < 0:  # Player above
+                self.hinge_offset = (0, -self.door_height / 2)
+            else:  # Player below
+                self.hinge_offset = (0, self.door_height / 2)
+
     def on_player_touch(self, player):
-        """Swing door into the opposite room from where the player is."""
+        """Swing door away from player with hinge on player's side."""
         if self.state != self.STATE_CLOSED:
             return
 
@@ -84,24 +110,11 @@ class Door(LevelObject):
         dx = player.pos.x - self.pos.x
         dy = player.pos.y - self.pos.y
 
-        # Set swing direction to open INTO the opposite room (away from player's room)
-        if self.orientation == "north":  # Bottom wall (horizontal door)
-            # Player below door (in current room) -> swing up into northern room
-            # Player above door (in northern room) -> swing down into current room
-            self.swing_direction = 1 if dy > 0 else -1
-        elif self.orientation == "south":  # Top wall (horizontal door)
-            # Player above door (in current room) -> swing down into southern room
-            # Player below door (in southern room) -> swing up into current room
-            self.swing_direction = -1 if dy > 0 else 1
-        elif self.orientation == "east":  # Right wall (vertical door)
-            # Player left of door (in current room) -> swing right into eastern room
-            # Player right of door (in eastern room) -> swing left into current room
-            self.swing_direction = 1 if dx < 0 else -1
-        elif self.orientation == "west":  # Left wall (vertical door)
-            # Player right of door (in current room) -> swing left into western room
-            # Player left of door (in western room) -> swing right into current room
-            self.swing_direction = -1 if dx < 0 else 1
+        # Set hinge on player's side so door swings away
+        self._set_hinge_for_player_side(dx, dy)
 
+        # Door always swings in positive direction (away from hinge/player)
+        self.swing_direction = 1
         self.state = self.STATE_OPENING
 
     def apply_force(self, angular_impulse, source_pos):
@@ -114,20 +127,16 @@ class Door(LevelObject):
         source_pos : Vector2
             Position of the force source (player) to determine swing direction
         """
-        # Determine swing direction if door is closed (same logic as on_player_touch)
+        # Set hinge position if door is closed (same logic as on_player_touch)
         if self.state == self.STATE_CLOSED:
             dx = source_pos.x - self.pos.x
             dy = source_pos.y - self.pos.y
 
-            if self.orientation == "north":
-                self.swing_direction = 1 if dy > 0 else -1
-            elif self.orientation == "south":
-                self.swing_direction = -1 if dy > 0 else 1
-            elif self.orientation == "east":
-                self.swing_direction = 1 if dx < 0 else -1
-            elif self.orientation == "west":
-                self.swing_direction = -1 if dx < 0 else 1
+            # Set hinge on player's side
+            self._set_hinge_for_player_side(dx, dy)
 
+            # Door swings in positive direction (away from hinge/player)
+            self.swing_direction = 1
             self.state = self.STATE_OPENING
 
         # Add to angular velocity (physics-based swinging)
