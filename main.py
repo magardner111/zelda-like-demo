@@ -145,6 +145,10 @@ def main():
                     camera.shake(*entity._pending_shake)
                     entity._pending_shake = None
 
+            # Level object interactions (doors, chests, etc.)
+            # Check BEFORE collision resolution so player can trigger doors on touch
+            current_map.check_level_object_interactions(player)
+
             # Wall collision — filter to walls near the player so we don't
             # run O(all_walls) checks against the entire map each frame.
             pr = player.radius + 4
@@ -163,9 +167,6 @@ def main():
 
             # Stairway transitions
             current_map.check_stairway_transitions(player)
-
-            # Level object interactions (doors, chests, etc.)
-            current_map.check_level_object_interactions(player)
 
             # Edge slide on upper layers
             current_map.check_edge_slide(player, dt)
