@@ -135,16 +135,32 @@ def generate_map(layout: Layout):
         cx, cy = rx + ROOM_SIZE // 2, ry + ROOM_SIZE // 2
 
         if role == "treasure":
-            chest_size = 32
-            chest_rect = (cx - chest_size // 2, cy - chest_size // 2, chest_size, chest_size)
+            # Orient so the longest face (96 px) faces the door.
+            # north/south door → horizontal wall → chest wider than tall.
+            # east/west door   → vertical wall   → chest taller than wide.
+            door_dir = next(iter(open_dirs), "north")
+            if door_dir in ("north", "south"):
+                cw, ch = 96, 64
+            else:
+                cw, ch = 64, 96
+            chest_rect = (cx - cw // 2, cy - ch // 2, cw, ch)
+            layer.add_floor_region(ObjectRegion(chest_rect, "chest", REGION_STATS["chest"]))
+
+        elif role == "side_loot":
+            cw, ch = 32, 32
+            chest_rect = (cx - cw // 2, cy - ch // 2, cw, ch)
             layer.add_floor_region(ObjectRegion(chest_rect, "chest", REGION_STATS["chest"]))
 
         elif role == "boss":
             enemy = Enemy((cx, cy), ENEMY_STATS["lvl1enemy"])
             map_obj.enemies.append(enemy)
 
-    # --- player start: centre of room 0 ---
-    r0x, r0y    = room_origin(*layout.get_pos(0))
-    player_start = (r0x + ROOM_SIZE // 2, r0y + ROOM_SIZE // 2)
+    # --- player start: centre of the entrance room ---
+    entrance_id = next(
+        n for n in layout.rooms()
+        if layout.graph.nodes[n].get("role") == "entrance"
+    )
+    erx, ery = room_origin(*layout.get_pos(entrance_id))
+    player_start = (erx + ROOM_SIZE // 2, ery + ROOM_SIZE // 2)
 
     return map_obj, player_start
