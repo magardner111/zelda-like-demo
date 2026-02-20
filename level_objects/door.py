@@ -52,10 +52,13 @@ class Door(LevelObject):
         self.just_opened = False  # Set to True when door finishes opening
 
         # Physics properties
-        self.max_angle = 100.0  # Can swing past 90 degrees
-        self.bounce_factor = 0.6  # How much velocity is retained on bounce
-        self.friction = 0.95  # Velocity multiplier per frame (damping)
-        self.impact_threshold = 50.0  # Min velocity for impact effects (camera shake)
+        self.max_angle = 89.0  # Stop just before perpendicular to wall
+        self.rest_angle = 85.0  # Angle where door settles when open
+        self.rest_threshold = 5.0  # Velocity threshold to snap to rest angle
+        self.bounce_factor = 0.3  # How much velocity is retained on bounce (low for quick settling)
+        self.friction = 0.92  # Velocity multiplier per frame (damping)
+        self.rest_friction = 0.7  # Extra damping near rest angle
+        self.impact_threshold = 80.0  # Min velocity for impact effects (camera shake)
 
         # Determine hinge position based on orientation
         # Hinge is on the side closest to the wall
@@ -89,7 +92,6 @@ class Door(LevelObject):
             self.swing_direction = -1
 
         self.state = self.STATE_OPENING
-        self.target_angle = 90.0
 
     def apply_force(self, angular_impulse):
         """Apply an angular impulse to the door (e.g., from sword hit).
@@ -176,17 +178,35 @@ class Door(LevelObject):
                 # Update angle based on velocity
                 self.swing_angle += self.angular_velocity * dt
 
-                # Apply friction/damping
-                self.angular_velocity *= self.friction
+                # Apply friction/damping (stronger near rest angle)
+                base_friction = self.friction
+                if abs(self.swing_angle - self.rest_angle) < 10.0:
+                    # Extra damping near rest position to settle quickly
+                    base_friction = self.rest_friction
+                self.angular_velocity *= base_friction
 
-                # Bounce off max angle
-                if self.swing_angle >= self.max_angle:
+                # Snap to rest angle if close and moving slowly
+                if (abs(self.swing_angle - self.rest_angle) < 3.0 and
+                    abs(self.angular_velocity) < self.rest_threshold):
+                    self.swing_angle = self.rest_angle
+                    self.angular_velocity = 0.0
+                    self.state = self.STATE_OPEN
+                    if not self.just_opened:
+                        self.just_opened = True
+
+                # Stop at max angle (no bounce, just absorb)
+                elif self.swing_angle >= self.max_angle:
                     self.swing_angle = self.max_angle
-                    self.angular_velocity = -self.angular_velocity * self.bounce_factor
-
-                    # Impact effect if bouncing hard enough
+                    # Slow bounce for hard hits, otherwise just stop
                     if abs(self.angular_velocity) > self.impact_threshold:
+                        self.angular_velocity = -self.angular_velocity * self.bounce_factor
                         self.impact_this_frame = True
+                    else:
+                        self.angular_velocity = 0.0
+
+                    if not self.just_opened:
+                        self.just_opened = True
+                        self.state = self.STATE_OPEN
 
                 # Bounce off closed position
                 elif self.swing_angle <= 0:
@@ -197,21 +217,21 @@ class Door(LevelObject):
                         self.impact_this_frame = True
 
                 # Check if door reached open position for first time
-                if self.swing_angle >= 90.0 and not self.just_opened:
+                elif self.swing_angle >= self.rest_angle and not self.just_opened:
                     self.just_opened = True
                     self.state = self.STATE_OPEN
 
             else:
                 # No velocity - use simple animation for touch-to-open
-                if abs(self.swing_angle - self.target_angle) > 0.1:
+                if abs(self.swing_angle - self.rest_angle) > 0.1:
                     delta = self.swing_speed * dt
-                    if self.swing_angle < self.target_angle:
-                        self.swing_angle = min(self.swing_angle + delta, self.target_angle)
+                    if self.swing_angle < self.rest_angle:
+                        self.swing_angle = min(self.swing_angle + delta, self.rest_angle)
                     else:
-                        self.swing_angle = max(self.swing_angle - delta, self.target_angle)
+                        self.swing_angle = max(self.swing_angle - delta, self.rest_angle)
                 else:
                     # Finished opening
-                    self.swing_angle = self.target_angle
+                    self.swing_angle = self.rest_angle
                     self.state = self.STATE_OPEN
                     if not self.just_opened:
                         self.just_opened = True
