@@ -1,87 +1,109 @@
-import os
+import math
 import pygame
 
 from level_objects.level_object_base import LevelObject
 
 
 class Door(LevelObject):
-    """An animated door that blocks the player until opened on touch."""
+    """A geometric door that swings open away from the player."""
 
     # Animation states
     STATE_CLOSED = "closed"
     STATE_OPENING = "opening"
     STATE_OPEN = "open"
 
-    def __init__(self, position, orientation="north", image_path=None):
-        """Create a door.
+    def __init__(self, position, orientation="north"):
+        """Create a swinging door.
 
         Parameters
         ----------
         position : tuple
-            (x, y) position in world coordinates
+            (x, y) position in world coordinates (center of doorway)
         orientation : str
-            Direction the door faces: "north", "south", "east", "west"
-        image_path : str, optional
-            Path to custom door sprite sheet
+            Which wall the door is on: "north", "south", "east", "west"
         """
-        super().__init__(position, size=(64, 64))
+        # Door dimensions based on orientation
+        if orientation in ("north", "south"):
+            width, height = 64, 12  # Horizontal door
+        else:
+            width, height = 12, 64  # Vertical door
+
+        super().__init__(position, size=(width, height))
 
         self.orientation = orientation
+        self.door_width = width
+        self.door_height = height
 
-        # Load door sprite sheet (3 frames: closed, opening, open)
-        if image_path is None:
-            image_path = os.path.join(
-                os.path.dirname(__file__),
-                "..", "assets", "level_objects", "dungeon", "door.png"
-            )
-
-        sprite_sheet = pygame.image.load(image_path).convert_alpha()
-        frame_width = 64
-
-        # Extract frames from the sprite sheet
-        self.frames = []
-        for i in range(3):
-            frame = sprite_sheet.subsurface(
-                pygame.Rect(i * frame_width, 0, frame_width, frame_width)
-            )
-
-            # Rotate frames for vertical doors (east/west walls)
-            if orientation in ("east", "west"):
-                frame = pygame.transform.rotate(frame, 90)
-
-            self.frames.append(frame)
+        # Visual properties
+        self.door_color = (101, 67, 33)  # Brown wood color
+        self.door_edge_color = (70, 46, 23)  # Darker edge
+        self.hinge_color = (40, 40, 40)  # Dark gray hinge
 
         # Animation state
         self.state = self.STATE_CLOSED
-        self.current_frame = 0
-        self.anim_timer = 0.0
-        self.frame_duration = 0.15  # seconds per frame during opening animation
+        self.swing_angle = 0.0  # Current rotation angle (0 = closed, 90 = open)
+        self.target_angle = 0.0
+        self.swing_speed = 300.0  # degrees per second
+        self.swing_direction = 1  # 1 for clockwise, -1 for counter-clockwise
+
+        # Determine hinge position based on orientation
+        # Hinge is on the side closest to the wall
+        self._setup_hinge()
+
+    def _setup_hinge(self):
+        """Set up hinge point based on door orientation."""
+        if self.orientation == "north":  # Bottom wall, hinge on left
+            self.hinge_offset = (-self.door_width / 2, 0)
+        elif self.orientation == "south":  # Top wall, hinge on left
+            self.hinge_offset = (-self.door_width / 2, 0)
+        elif self.orientation == "east":  # Right wall, hinge on top
+            self.hinge_offset = (0, -self.door_height / 2)
+        elif self.orientation == "west":  # Left wall, hinge on top
+            self.hinge_offset = (0, -self.door_height / 2)
 
     def on_player_touch(self, player):
-        """Open the door when the player touches it."""
-        if self.state == self.STATE_CLOSED:
-            self.state = self.STATE_OPENING
-            self.anim_timer = 0.0
-            self.current_frame = 0
+        """Swing door open away from the player."""
+        if self.state != self.STATE_CLOSED:
+            return
+
+        # Determine which side the player is approaching from
+        dx = player.pos.x - self.pos.x
+        dy = player.pos.y - self.pos.y
+
+        # Set swing direction based on player position relative to door
+        if self.orientation == "north":  # Bottom wall
+            # Player coming from bottom (inside room) -> swing down
+            # Player coming from top (outside room) -> swing up
+            self.swing_direction = 1 if dy < 0 else -1
+        elif self.orientation == "south":  # Top wall
+            self.swing_direction = 1 if dy > 0 else -1
+        elif self.orientation == "east":  # Right wall
+            self.swing_direction = 1 if dx < 0 else -1
+        elif self.orientation == "west":  # Left wall
+            self.swing_direction = 1 if dx > 0 else -1
+
+        self.state = self.STATE_OPENING
+        self.target_angle = 90.0
 
     def update(self, dt):
-        """Update door animation."""
+        """Update door swing animation."""
         if self.state == self.STATE_OPENING:
-            self.anim_timer += dt
-
-            # Advance through frames
-            if self.anim_timer >= self.frame_duration:
-                self.anim_timer -= self.frame_duration
-                self.current_frame += 1
-
-                # Finish opening animation
-                if self.current_frame >= len(self.frames):
-                    self.state = self.STATE_OPEN
-                    self.solid = False  # Allow player to pass through
-                    self.active = False  # Make door disappear
+            # Animate swing
+            if abs(self.swing_angle - self.target_angle) > 0.1:
+                delta = self.swing_speed * dt
+                if self.swing_angle < self.target_angle:
+                    self.swing_angle = min(self.swing_angle + delta, self.target_angle)
+                else:
+                    self.swing_angle = max(self.swing_angle - delta, self.target_angle)
+            else:
+                # Finished opening
+                self.swing_angle = self.target_angle
+                self.state = self.STATE_OPEN
+                self.solid = False
+                self.active = False  # Door is fully open, make it disappear
 
         elif self.state == self.STATE_CLOSED:
-            self.current_frame = 0
+            self.swing_angle = 0.0
             self.solid = True
 
         elif self.state == self.STATE_OPEN:
@@ -89,13 +111,64 @@ class Door(LevelObject):
             self.active = False
 
     def draw(self, screen, camera):
-        """Draw the current door frame."""
+        """Draw the swinging door."""
         if not self.active:
             return
 
         screen_pos = camera.apply(self.pos)
-        frame = self.frames[self.current_frame]
 
-        # Center the frame on the door position
-        draw_rect = frame.get_rect(center=(screen_pos.x, screen_pos.y))
-        screen.blit(frame, draw_rect)
+        # Get hinge position in world space
+        hinge_world = (
+            self.pos.x + self.hinge_offset[0],
+            self.pos.y + self.hinge_offset[1]
+        )
+        hinge_screen = camera.apply(pygame.Vector2(hinge_world))
+
+        # Calculate the four corners of the door rectangle before rotation
+        if self.orientation in ("north", "south"):
+            # Horizontal door
+            half_w = self.door_width / 2
+            half_h = self.door_height / 2
+            corners = [
+                (-half_w, -half_h),  # Top-left
+                (half_w, -half_h),   # Top-right
+                (half_w, half_h),    # Bottom-right
+                (-half_w, half_h)    # Bottom-left
+            ]
+        else:
+            # Vertical door
+            half_w = self.door_width / 2
+            half_h = self.door_height / 2
+            corners = [
+                (-half_w, -half_h),
+                (half_w, -half_h),
+                (half_w, half_h),
+                (-half_w, half_h)
+            ]
+
+        # Apply rotation around hinge point
+        angle_rad = math.radians(self.swing_angle * self.swing_direction)
+        rotated_corners = []
+
+        for cx, cy in corners:
+            # Translate to hinge origin
+            px = cx - self.hinge_offset[0]
+            py = cy - self.hinge_offset[1]
+
+            # Rotate
+            rx = px * math.cos(angle_rad) - py * math.sin(angle_rad)
+            ry = px * math.sin(angle_rad) + py * math.cos(angle_rad)
+
+            # Translate back and convert to screen space
+            world_x = hinge_world[0] + rx
+            world_y = hinge_world[1] + ry
+            screen_point = camera.apply(pygame.Vector2(world_x, world_y))
+            rotated_corners.append((screen_point.x, screen_point.y))
+
+        # Draw door rectangle
+        pygame.draw.polygon(screen, self.door_color, rotated_corners)
+        pygame.draw.polygon(screen, self.door_edge_color, rotated_corners, 2)
+
+        # Draw hinge as a small circle
+        pygame.draw.circle(screen, self.hinge_color,
+                          (int(hinge_screen.x), int(hinge_screen.y)), 4)
