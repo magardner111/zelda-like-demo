@@ -152,12 +152,20 @@ def main():
             solid_near = [r for r in solid_regions
                           if r.rect.left - pr < px < r.rect.right + pr
                           and r.rect.top - pr < py < r.rect.bottom + pr]
-            resolve_entity_vs_regions(player, solid_near)
+
+            # Add solid level objects to collision list
+            solid_objects = current_map.get_solid_level_objects()
+            all_solid = solid_near + solid_objects
+
+            resolve_entity_vs_regions(player, all_solid)
 
             current_map.clamp_entity(player)
 
             # Stairway transitions
             current_map.check_stairway_transitions(player)
+
+            # Level object interactions (doors, chests, etc.)
+            current_map.check_level_object_interactions(player)
 
             # Edge slide on upper layers
             current_map.check_edge_slide(player, dt)

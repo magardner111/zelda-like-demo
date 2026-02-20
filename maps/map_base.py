@@ -58,6 +58,7 @@ class MapBase:
         self.enemies = []
         self.floor_layers = []
         self.stairways = []
+        self.level_objects = []           # Interactable objects like doors, chests
         self._visibility_poly = None
         self._vis_last_pos = None
         self._vis_frames_since_recompute = VIS_RECOMPUTE_MAX_FRAMES  # force first frame
@@ -151,6 +152,10 @@ class MapBase:
     def add_stairway(self, stairway):
         self.stairways.append(stairway)
 
+    def add_level_object(self, obj):
+        """Add an interactable level object like a door or chest."""
+        self.level_objects.append(obj)
+
     def get_layer(self, elevation):
         for layer in self.floor_layers:
             if layer.elevation == elevation:
@@ -178,7 +183,23 @@ class MapBase:
         if room_id is not None:
             self.visited_rooms.add(room_id)
 
+    def get_solid_level_objects(self):
+        """Return list of level objects that currently block movement."""
+        return [obj for obj in self.level_objects if obj.solid and obj.active]
+
+    def check_level_object_interactions(self, player):
+        """Check if player is touching any interactable level objects."""
+        for obj in self.level_objects:
+            if not obj.active:
+                continue
+            if obj.overlaps_circle(player.pos, player.radius):
+                obj.on_player_touch(player)
+
     def update(self, dt, player):
+        # Update level objects
+        for obj in self.level_objects:
+            obj.update(dt)
+
         # Cache layers and solid region lists to avoid redundant work per enemy.
         layer_cache = {}
         solid_cache = {}   # elev -> full solid region list for that layer
@@ -417,6 +438,10 @@ class MapBase:
         # Draw stairways visible on the current layer
         for stairway in self.stairways:
             stairway.draw(screen, camera, view_layer)
+
+        # Draw level objects (doors, chests, etc.)
+        for obj in self.level_objects:
+            obj.draw(screen, camera)
 
         # Fog of war: draw black overlay over unvisited rooms
         if self.room_bounds:

@@ -5,11 +5,12 @@ from core.floor_layer import FloorLayer
 from core.region_base import FloorRegion, ObjectRegion, WallRegion
 from data.enemy_stats import ENEMY_STATS
 from data.region_stats import REGION_STATS
+from level_objects.door import Door
 from maps.layout import Layout, RoomRole, get_direction
 from maps.map_base import MapBase
 
-ROOM_SIZE = 600
-WALL_THICKNESS = 32
+ROOM_SIZE = 900
+WALL_THICKNESS = 16
 DOOR_WIDTH = 64
 
 _DOOR_OFFSET = (ROOM_SIZE - DOOR_WIDTH) // 2   # 368 — gap starts here
@@ -164,3 +165,35 @@ def generate_map(layout: Layout):
     player_start = (erx + ROOM_SIZE // 2, ery + ROOM_SIZE // 2)
 
     return map_obj, player_start
+
+
+def add_door_to_doorway(map_obj, room_x, room_y, direction):
+    """Add a Door object at the specified doorway.
+
+    Parameters
+    ----------
+    map_obj : MapBase
+        The map to add the door to.
+    room_x, room_y : int
+        Top-left pixel coordinates of the room.
+    direction : str
+        Cardinal direction of the doorway: "north", "south", "east", "west".
+    """
+    door_center_x = 0
+    door_center_y = 0
+
+    if direction == "north":  # Bottom wall
+        door_center_x = room_x + ROOM_SIZE // 2
+        door_center_y = room_y + ROOM_SIZE - WALL_THICKNESS // 2
+    elif direction == "south":  # Top wall
+        door_center_x = room_x + ROOM_SIZE // 2
+        door_center_y = room_y + WALL_THICKNESS // 2
+    elif direction == "east":  # Right wall
+        door_center_x = room_x + ROOM_SIZE - WALL_THICKNESS // 2
+        door_center_y = room_y + ROOM_SIZE // 2
+    elif direction == "west":  # Left wall
+        door_center_x = room_x + WALL_THICKNESS // 2
+        door_center_y = room_y + ROOM_SIZE // 2
+
+    door = Door((door_center_x, door_center_y))
+    map_obj.add_level_object(door)
