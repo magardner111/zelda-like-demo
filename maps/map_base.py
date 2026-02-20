@@ -367,6 +367,12 @@ class MapBase:
             [r.rect for r in layer.wall_regions if check.colliderect(r.rect)]
             if layer else []
         )
+
+        # Add level objects (doors, etc.) as visibility blockers
+        for obj in self.level_objects:
+            if obj.active and check.colliderect(obj.rect):
+                wall_rects.append(obj.rect)
+
         self._visibility_poly = compute_visibility_polygon(
             (px, py), wall_rects, self.width, self.height,
         )
