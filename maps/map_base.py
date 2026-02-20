@@ -369,16 +369,16 @@ class MapBase:
         )
 
         # Add level objects (doors, etc.) as visibility blockers
-        # Only closed doors block visibility; open doors are swung out of the way
+        # Use the rotated shape of doors for accurate visibility blocking
         for obj in self.level_objects:
             if obj.active and check.colliderect(obj.rect):
-                # Check if object is a door and if it's closed
-                if hasattr(obj, 'state'):
-                    # Door - only block if closed or opening
-                    if obj.state in ('closed', 'opening'):
-                        wall_rects.append(obj.rect)
+                # Doors provide their rotated bounding box
+                if hasattr(obj, 'get_visibility_rect'):
+                    vis_rect = obj.get_visibility_rect()
+                    if check.colliderect(vis_rect):
+                        wall_rects.append(vis_rect)
                 else:
-                    # Other objects always block
+                    # Other objects use their static rect
                     wall_rects.append(obj.rect)
 
         self._visibility_poly = compute_visibility_polygon(

@@ -80,6 +80,59 @@ class Door(LevelObject):
         self.state = self.STATE_OPENING
         self.target_angle = 90.0
 
+    def get_visibility_rect(self):
+        """Get the axis-aligned bounding box of the door in its current rotation.
+
+        This is used for visibility blocking - the rotated door shape blocks vision.
+        """
+        # Get hinge position in world space
+        hinge_world = (
+            self.pos.x + self.hinge_offset[0],
+            self.pos.y + self.hinge_offset[1]
+        )
+
+        # Calculate the four corners of the door rectangle
+        if self.orientation in ("north", "south"):
+            half_w = self.door_width / 2
+            half_h = self.door_height / 2
+        else:
+            half_w = self.door_width / 2
+            half_h = self.door_height / 2
+
+        corners = [
+            (-half_w, -half_h),
+            (half_w, -half_h),
+            (half_w, half_h),
+            (-half_w, half_h)
+        ]
+
+        # Apply rotation around hinge point
+        angle_rad = math.radians(self.swing_angle * self.swing_direction)
+        rotated_corners = []
+
+        for cx, cy in corners:
+            # Translate to hinge origin
+            px = cx - self.hinge_offset[0]
+            py = cy - self.hinge_offset[1]
+
+            # Rotate
+            rx = px * math.cos(angle_rad) - py * math.sin(angle_rad)
+            ry = px * math.sin(angle_rad) + py * math.cos(angle_rad)
+
+            # Translate back to world space
+            world_x = hinge_world[0] + rx
+            world_y = hinge_world[1] + ry
+            rotated_corners.append((world_x, world_y))
+
+        # Find axis-aligned bounding box
+        min_x = min(c[0] for c in rotated_corners)
+        max_x = max(c[0] for c in rotated_corners)
+        min_y = min(c[1] for c in rotated_corners)
+        max_y = max(c[1] for c in rotated_corners)
+
+        return pygame.Rect(int(min_x), int(min_y),
+                          int(max_x - min_x), int(max_y - min_y))
+
     def update(self, dt):
         """Update door swing animation."""
         if self.state == self.STATE_OPENING:
