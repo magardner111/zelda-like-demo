@@ -190,6 +190,7 @@ def main():
             # Fade enemy visibility alpha and draw.
             # Skip enemies that are entirely outside the viewport — no
             # point running point_in_polygon or drawing off-screen enemies.
+            # Also skip enemies in unvisited rooms (hidden by fog of war).
             _sw, _sh = screen.get_size()
             for enemy in current_map.enemies:
                 if enemy.current_layer != player.current_layer:
@@ -198,6 +199,13 @@ def main():
                 if (_ex + enemy.size < 0 or _ex - enemy.size > _sw or
                         _ey + enemy.size < 0 or _ey - enemy.size > _sh):
                     continue
+
+                # Skip enemies in unvisited rooms (fog of war)
+                if current_map.room_bounds:
+                    enemy_room = current_map.get_room_at(enemy.pos.x, enemy.pos.y)
+                    if enemy_room is not None and enemy_room not in current_map.visited_rooms:
+                        continue
+
                 if current_map.is_visible(enemy.pos.x, enemy.pos.y):
                     enemy.visibility_alpha = 255
                 else:

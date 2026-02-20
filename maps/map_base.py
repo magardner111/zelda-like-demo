@@ -470,22 +470,29 @@ class MapBase:
                     pygame.draw.rect(screen, (0, 0, 0), screen_rect)
 
         # Draw level objects (doors, chests, etc.) AFTER fog
-        # Doors on boundaries of visited rooms should always be visible
+        # Only draw objects in or adjacent to visited rooms
         for obj in self.level_objects:
-            # Check if door is adjacent to any visited room
-            if self.room_bounds and hasattr(obj, 'orientation'):
-                # Door is visible if it's on the edge of a visited room
-                adjacent_to_visited = False
-                for room_id in self.visited_rooms:
-                    rx, ry, rw, rh = self.room_bounds[room_id]
-                    # Check if door is on the boundary of this room
-                    margin = 20  # Tolerance for door being "on" the boundary
-                    if (rx - margin <= obj.pos.x <= rx + rw + margin and
-                        ry - margin <= obj.pos.y <= ry + rh + margin):
-                        # Door is within or on boundary of a visited room
-                        adjacent_to_visited = True
-                        break
-                if adjacent_to_visited:
+            if self.room_bounds:
+                # Check if object should be visible
+                should_draw = False
+
+                # Doors on boundaries of visited rooms are always visible
+                if hasattr(obj, 'orientation'):
+                    for room_id in self.visited_rooms:
+                        rx, ry, rw, rh = self.room_bounds[room_id]
+                        # Check if door is on the boundary of this room
+                        margin = 20  # Tolerance for door being "on" the boundary
+                        if (rx - margin <= obj.pos.x <= rx + rw + margin and
+                            ry - margin <= obj.pos.y <= ry + rh + margin):
+                            should_draw = True
+                            break
+                else:
+                    # Other objects (chests, etc.) only visible if in visited room
+                    obj_room = self.get_room_at(obj.pos.x, obj.pos.y)
+                    if obj_room in self.visited_rooms:
+                        should_draw = True
+
+                if should_draw:
                     obj.draw(screen, camera)
             else:
                 # No fog of war, draw all objects
