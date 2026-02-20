@@ -65,6 +65,10 @@ class MapBase:
         self._vis_overlay_poly_id = None  # id() of polygon used to fill the overlay
         self._vis_overlay_offset = None   # (ox, oy) camera offset when overlay was drawn
         self._dark_overlay = None         # pre-allocated BLEND_MULT surface for layer darkening
+        # Fog of war
+        self.layout = None                # Layout graph (None if from JSON)
+        self.room_bounds = {}             # room_id -> (x, y, w, h) pixel rect
+        self.visited_rooms = set()        # room_ids that have been visited
 
     @classmethod
     def from_json(cls, path):
@@ -158,6 +162,21 @@ class MapBase:
         r = getattr(entity, "radius", 0)
         entity.pos.x = max(r, min(self.width - r, entity.pos.x))
         entity.pos.y = max(r, min(self.height - r, entity.pos.y))
+
+    def get_room_at(self, x, y):
+        """Return the room_id containing the point (x, y), or None."""
+        for room_id, (rx, ry, rw, rh) in self.room_bounds.items():
+            if rx <= x < rx + rw and ry <= y < ry + rh:
+                return room_id
+        return None
+
+    def mark_current_room_visited(self, player):
+        """Mark the room containing the player as visited."""
+        if not self.room_bounds:
+            return
+        room_id = self.get_room_at(player.pos.x, player.pos.y)
+        if room_id is not None:
+            self.visited_rooms.add(room_id)
 
     def update(self, dt, player):
         # Cache layers and solid region lists to avoid redundant work per enemy.
@@ -398,6 +417,14 @@ class MapBase:
         # Draw stairways visible on the current layer
         for stairway in self.stairways:
             stairway.draw(screen, camera, view_layer)
+
+        # Fog of war: draw black overlay over unvisited rooms
+        if self.room_bounds:
+            for room_id, (rx, ry, rw, rh) in self.room_bounds.items():
+                if room_id not in self.visited_rooms:
+                    room_rect = pygame.Rect(rx, ry, rw, rh)
+                    screen_rect = room_rect.move(camera.offset)
+                    pygame.draw.rect(screen, (0, 0, 0), screen_rect)
 
     def draw_visibility(self, screen, camera, player):
         """Draw a dark overlay everywhere the player can't see.

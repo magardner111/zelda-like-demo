@@ -6,7 +6,7 @@ from data.region_stats import REGION_STATS
 from maps.layout import Layout, get_direction
 from maps.map_base import MapBase
 
-ROOM_SIZE = 800
+ROOM_SIZE = 600
 WALL_THICKNESS = 32
 DOOR_WIDTH = 64
 
@@ -79,6 +79,9 @@ def generate_map(layout: Layout):
     layer   = FloorLayer(elevation=0, bg_color=_LAYER_BG)
     map_obj.add_layer(layer)
 
+    # Store layout for fog of war
+    map_obj.layout = layout
+
     wall_stats  = REGION_STATS["wall"]
     floor_stats = REGION_STATS["stone"]
 
@@ -86,6 +89,9 @@ def generate_map(layout: Layout):
     for room_id in layout.rooms():
         gx, gy   = layout.get_pos(room_id)
         rx, ry   = room_origin(gx, gy)
+
+        # Store room bounds for fog of war
+        map_obj.room_bounds[room_id] = (rx, ry, ROOM_SIZE, ROOM_SIZE)
 
         # Which cardinal directions have a corridor to a neighbour?
         # get_direction uses the layout's convention:

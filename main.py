@@ -68,6 +68,8 @@ def main():
         current_map, player_start = generate_map(layout)
         player.pos = pygame.Vector2(player_start)
         print(f"Generated map  seed={layout.seed}")
+        # Mark starting room as visited
+        current_map.mark_current_room_visited(player)
     camera.set_bounds(current_map.width, current_map.height)
     options = GameOptions()
     menu = MainMenu(options=options)
@@ -133,6 +135,9 @@ def main():
             ]
 
             player.update(dt, input_manager, enemies_on_layer, camera, speed_factor)
+
+            # Mark current room as visited for fog of war
+            current_map.mark_current_room_visited(player)
 
             # Drain pending camera shakes from all entities
             for entity in [player] + current_map.enemies:
