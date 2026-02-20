@@ -62,25 +62,20 @@ class Door(LevelObject):
             self.hinge_offset = (0, -self.door_height / 2)
 
     def on_player_touch(self, player):
-        """Swing door open away from the player."""
+        """Swing door open into the room it faces."""
         if self.state != self.STATE_CLOSED:
             return
 
-        # Determine which side the player is approaching from
-        dx = player.pos.x - self.pos.x
-        dy = player.pos.y - self.pos.y
-
-        # Set swing direction based on player position relative to door
-        if self.orientation == "north":  # Bottom wall
-            # Player coming from bottom (inside room) -> swing down
-            # Player coming from top (outside room) -> swing up
-            self.swing_direction = 1 if dy < 0 else -1
-        elif self.orientation == "south":  # Top wall
-            self.swing_direction = 1 if dy > 0 else -1
-        elif self.orientation == "east":  # Right wall
-            self.swing_direction = 1 if dx < 0 else -1
-        elif self.orientation == "west":  # Left wall
-            self.swing_direction = 1 if dx > 0 else -1
+        # Door always swings into the room it faces (away from the wall)
+        # This is deterministic based on orientation, not player position
+        if self.orientation == "north":  # Bottom wall - swing down (into northern room)
+            self.swing_direction = 1
+        elif self.orientation == "south":  # Top wall - swing up (into southern room)
+            self.swing_direction = -1
+        elif self.orientation == "east":  # Right wall - swing right (into eastern room)
+            self.swing_direction = 1
+        elif self.orientation == "west":  # Left wall - swing left (into western room)
+            self.swing_direction = -1
 
         self.state = self.STATE_OPENING
         self.target_angle = 90.0

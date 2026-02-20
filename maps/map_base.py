@@ -439,10 +439,6 @@ class MapBase:
         for stairway in self.stairways:
             stairway.draw(screen, camera, view_layer)
 
-        # Draw level objects (doors, chests, etc.)
-        for obj in self.level_objects:
-            obj.draw(screen, camera)
-
         # Fog of war: draw black overlay over unvisited rooms
         if self.room_bounds:
             for room_id, (rx, ry, rw, rh) in self.room_bounds.items():
@@ -450,6 +446,28 @@ class MapBase:
                     room_rect = pygame.Rect(rx, ry, rw, rh)
                     screen_rect = room_rect.move(camera.offset)
                     pygame.draw.rect(screen, (0, 0, 0), screen_rect)
+
+        # Draw level objects (doors, chests, etc.) AFTER fog
+        # Doors on boundaries of visited rooms should always be visible
+        for obj in self.level_objects:
+            # Check if door is adjacent to any visited room
+            if self.room_bounds and hasattr(obj, 'orientation'):
+                # Door is visible if it's on the edge of a visited room
+                adjacent_to_visited = False
+                for room_id in self.visited_rooms:
+                    rx, ry, rw, rh = self.room_bounds[room_id]
+                    # Check if door is on the boundary of this room
+                    margin = 20  # Tolerance for door being "on" the boundary
+                    if (rx - margin <= obj.pos.x <= rx + rw + margin and
+                        ry - margin <= obj.pos.y <= ry + rh + margin):
+                        # Door is within or on boundary of a visited room
+                        adjacent_to_visited = True
+                        break
+                if adjacent_to_visited:
+                    obj.draw(screen, camera)
+            else:
+                # No fog of war, draw all objects
+                obj.draw(screen, camera)
 
     def draw_visibility(self, screen, camera, player):
         """Draw a dark overlay everywhere the player can't see.
