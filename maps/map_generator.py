@@ -5,7 +5,7 @@ from core.floor_layer import FloorLayer
 from core.region_base import FloorRegion, ObjectRegion, WallRegion
 from data.enemy_stats import ENEMY_STATS
 from data.region_stats import REGION_STATS
-from maps.layout import Layout, get_direction
+from maps.layout import Layout, RoomRole, get_direction
 from maps.map_base import MapBase
 
 ROOM_SIZE = 600
@@ -131,10 +131,10 @@ def generate_map(layout: Layout):
             layer.add_wall_region(WallRegion(rect, wall_stats))
 
         # --- room contents based on layout role ---
-        role = layout.graph.nodes[room_id].get("role", "normal")
+        role = layout.graph.nodes[room_id].get("role", RoomRole.NORMAL)
         cx, cy = rx + ROOM_SIZE // 2, ry + ROOM_SIZE // 2
 
-        if role == "treasure":
+        if role == RoomRole.TREASURE:
             # Orient so the longest face (96 px) faces the door.
             # north/south door → horizontal wall → chest wider than tall.
             # east/west door   → vertical wall   → chest taller than wide.
@@ -146,19 +146,19 @@ def generate_map(layout: Layout):
             chest_rect = (cx - cw // 2, cy - ch // 2, cw, ch)
             layer.add_floor_region(ObjectRegion(chest_rect, "chest", REGION_STATS["chest"]))
 
-        elif role == "side_loot":
+        elif role == RoomRole.SIDE_LOOT:
             cw, ch = 32, 32
             chest_rect = (cx - cw // 2, cy - ch // 2, cw, ch)
             layer.add_floor_region(ObjectRegion(chest_rect, "chest", REGION_STATS["chest"]))
 
-        elif role == "boss":
+        elif role == RoomRole.BOSS:
             enemy = Enemy((cx, cy), ENEMY_STATS["lvl1enemy"])
             map_obj.enemies.append(enemy)
 
     # --- player start: centre of the entrance room ---
     entrance_id = next(
         n for n in layout.rooms()
-        if layout.graph.nodes[n].get("role") == "entrance"
+        if layout.graph.nodes[n].get("role") == RoomRole.ENTRANCE
     )
     erx, ery = room_origin(*layout.get_pos(entrance_id))
     player_start = (erx + ROOM_SIZE // 2, ery + ROOM_SIZE // 2)

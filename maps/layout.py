@@ -1,6 +1,27 @@
 import random
+from enum import Enum
 
 import networkx as nx
+
+
+class RoomRole(Enum):
+    ENTRANCE    = "entrance"
+    TREASURE    = "treasure"
+    BOSS        = "boss"
+    MAIN_PATH   = "main_path"
+    PRE_BOSS_KEY = "pre_boss_key"
+    SIDE_LOOT   = "side_loot"
+    SIDE_PATH   = "side_path"
+    NORMAL      = "normal"
+
+
+class RoomTopology(Enum):
+    DEAD_END          = "dead_end"
+    CORRIDOR_STRAIGHT = "corridor_straight"
+    CORRIDOR_CORNER   = "corridor_corner"
+    T_JUNCTION        = "t_junction"
+    CROSS             = "cross"
+    ISOLATED          = "isolated"
 
 
 class Layout:
@@ -163,14 +184,14 @@ def connect_adjacent_nodes(G,boss=None,treasure=None):
 # ============================================================
 def classify_room(doors):
     open_doors=[d for d,v in doors.items() if v is not None]
-    if len(open_doors)==1: return "dead_end"
+    if len(open_doors)==1: return RoomTopology.DEAD_END
     if len(open_doors)==2:
         if {"north","south"}<=set(open_doors) or {"east","west"}<=set(open_doors):
-            return "corridor_straight"
-        return "corridor_corner"
-    if len(open_doors)==3: return "t_junction"
-    if len(open_doors)==4: return "cross"
-    return "isolated"
+            return RoomTopology.CORRIDOR_STRAIGHT
+        return RoomTopology.CORRIDOR_CORNER
+    if len(open_doors)==3: return RoomTopology.T_JUNCTION
+    if len(open_doors)==4: return RoomTopology.CROSS
+    return RoomTopology.ISOLATED
 
 
 # ============================================================
@@ -207,10 +228,8 @@ def generate_layout(n_nodes=15, min_chain=5, seed=None):
         automatically so the result is still replayable via layout.seed.
 
     Extra node attributes set on the returned Layout's graph:
-        role     – "entrance" | "treasure" | "boss" | "main_path" |
-                   "pre_boss_key" | "side_loot" | "side_path" | "normal"
-        topology – "dead_end" | "corridor_straight" | "corridor_corner" |
-                   "t_junction" | "cross" | "isolated"
+        role     – RoomRole enum member
+        topology – RoomTopology enum member
 
     Extra edge attributes:
         direction       – cardinal direction ("north"/"south"/"east"/"west")
@@ -258,24 +277,24 @@ def generate_layout(n_nodes=15, min_chain=5, seed=None):
             branch_count[node] += 1
 
     # --- room roles ---
-    room_roles = {n: "normal" for n in G.nodes}
-    room_roles[entrance] = "entrance"
-    room_roles[treasure] = "treasure"
+    room_roles = {n: RoomRole.NORMAL for n in G.nodes}
+    room_roles[entrance] = RoomRole.ENTRANCE
+    room_roles[treasure] = RoomRole.TREASURE
     if boss:
-        room_roles[boss] = "boss"
+        room_roles[boss] = RoomRole.BOSS
     for n in backbone[1:-2]:
-        room_roles[n] = "main_path"
+        room_roles[n] = RoomRole.MAIN_PATH
     for branch in branches:
         for i, n in enumerate(branch):
             if i == 0:
                 continue
             elif i == len(branch) - 1:
-                room_roles[n] = "side_loot"
+                room_roles[n] = RoomRole.SIDE_LOOT
             else:
-                room_roles[n] = "side_path"
+                room_roles[n] = RoomRole.SIDE_PATH
     for n in G.nodes:
         if boss and G.has_edge(n, boss) and n != boss and n != treasure:
-            room_roles[n] = "pre_boss_key"
+            room_roles[n] = RoomRole.PRE_BOSS_KEY
 
     # --- populate Layout ---
     layout = Layout()
