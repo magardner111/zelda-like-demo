@@ -76,17 +76,17 @@ class Door(LevelObject):
 
                 # Finish opening animation
                 if self.current_frame >= len(self.frames):
-                    self.current_frame = len(self.frames) - 1
                     self.state = self.STATE_OPEN
                     self.solid = False  # Allow player to pass through
+                    self.active = False  # Make door disappear
 
         elif self.state == self.STATE_CLOSED:
             self.current_frame = 0
             self.solid = True
 
         elif self.state == self.STATE_OPEN:
-            self.current_frame = len(self.frames) - 1
             self.solid = False
+            self.active = False
 
     def draw(self, screen, camera):
         """Draw the current door frame."""
