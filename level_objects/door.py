@@ -76,36 +76,58 @@ class Door(LevelObject):
             self.hinge_offset = (0, -self.door_height / 2)
 
     def on_player_touch(self, player):
-        """Swing door open into the room it faces."""
+        """Swing door open AWAY from the player's position."""
         if self.state != self.STATE_CLOSED:
             return
 
-        # Door always swings into the room it faces (away from the wall)
-        # This is deterministic based on orientation, not player position
-        if self.orientation == "north":  # Bottom wall - swing down (into northern room)
-            self.swing_direction = 1
-        elif self.orientation == "south":  # Top wall - swing up (into southern room)
-            self.swing_direction = -1
-        elif self.orientation == "east":  # Right wall - swing right (into eastern room)
-            self.swing_direction = 1
-        elif self.orientation == "west":  # Left wall - swing left (into western room)
-            self.swing_direction = -1
+        # Determine which side the player is on relative to the door
+        dx = player.pos.x - self.pos.x
+        dy = player.pos.y - self.pos.y
+
+        # Set swing direction to open AWAY from the player
+        if self.orientation == "north":  # Bottom wall (horizontal door)
+            # Player below door (dy > 0) -> swing up (away from player)
+            # Player above door (dy < 0) -> swing down (away from player)
+            self.swing_direction = -1 if dy > 0 else 1
+        elif self.orientation == "south":  # Top wall (horizontal door)
+            # Player above door (dy < 0) -> swing down (away from player)
+            # Player below door (dy > 0) -> swing up (away from player)
+            self.swing_direction = 1 if dy > 0 else -1
+        elif self.orientation == "east":  # Right wall (vertical door)
+            # Player right of door (dx > 0) -> swing right (away from player)
+            # Player left of door (dx < 0) -> swing left (away from player)
+            self.swing_direction = -1 if dx > 0 else 1
+        elif self.orientation == "west":  # Left wall (vertical door)
+            # Player left of door (dx < 0) -> swing left (away from player)
+            # Player right of door (dx > 0) -> swing right (away from player)
+            self.swing_direction = 1 if dx > 0 else -1
 
         self.state = self.STATE_OPENING
 
-    def apply_force(self, angular_impulse):
+    def apply_force(self, angular_impulse, source_pos):
         """Apply an angular impulse to the door (e.g., from sword hit).
 
         Parameters
         ----------
         angular_impulse : float
             Angular velocity to add (degrees per second)
+        source_pos : Vector2
+            Position of the force source (player) to determine swing direction
         """
-        # Determine swing direction if door is closed
+        # Determine swing direction if door is closed (same logic as on_player_touch)
         if self.state == self.STATE_CLOSED:
-            # Set direction based on sign of impulse, or use default
-            if angular_impulse != 0:
-                self.swing_direction = 1 if angular_impulse > 0 else -1
+            dx = source_pos.x - self.pos.x
+            dy = source_pos.y - self.pos.y
+
+            if self.orientation == "north":
+                self.swing_direction = -1 if dy > 0 else 1
+            elif self.orientation == "south":
+                self.swing_direction = 1 if dy > 0 else -1
+            elif self.orientation == "east":
+                self.swing_direction = -1 if dx > 0 else 1
+            elif self.orientation == "west":
+                self.swing_direction = 1 if dx > 0 else -1
+
             self.state = self.STATE_OPENING
 
         # Add to angular velocity (physics-based swinging)
