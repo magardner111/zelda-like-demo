@@ -99,8 +99,7 @@ class Door(LevelObject):
                 # Finished opening
                 self.swing_angle = self.target_angle
                 self.state = self.STATE_OPEN
-                self.solid = False
-                self.active = False  # Door is fully open, make it disappear
+                self.solid = False  # Door stays visible but non-solid
 
         elif self.state == self.STATE_CLOSED:
             self.swing_angle = 0.0
@@ -108,7 +107,6 @@ class Door(LevelObject):
 
         elif self.state == self.STATE_OPEN:
             self.solid = False
-            self.active = False
 
     def draw(self, screen, camera):
         """Draw the swinging door."""
