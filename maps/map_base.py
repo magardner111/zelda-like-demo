@@ -144,6 +144,17 @@ class MapBase:
                     enemy.pattern = pcls(**params)
                 map_obj.enemies.append(enemy)
 
+        # Load level objects
+        from level_objects.door import Door
+        for layer_data in data["layers"]:
+            for obj_data in layer_data.get("level_objects", []):
+                if obj_data.get("type") == "door":
+                    door = Door(
+                        (obj_data["x"], obj_data["y"]),
+                        orientation=obj_data.get("orientation", "north"),
+                    )
+                    map_obj.add_level_object(door)
+
         return map_obj
 
     def add_layer(self, layer):
@@ -208,6 +219,15 @@ class MapBase:
                         if room_id is not None:
                             self.visited_rooms.add(room_id)
 
+            # Check if swinging door hits any enemies
+            if hasattr(obj, 'check_enemy_collisions'):
+                obj.check_enemy_collisions(self.enemies)
+
+            # Sword hit: camera shake on connect
+            if hasattr(obj, '_sword_impact') and obj._sword_impact:
+                player._pending_shake = (0.05, 4)
+                obj._sword_impact = False
+
             # Check if any doors impacted (bounce off wall) - shake camera and alert enemies
             if hasattr(obj, 'impact_this_frame') and obj.impact_this_frame:
                 # Queue camera shake (will be consumed by main loop)
@@ -245,6 +265,12 @@ class MapBase:
             # enemy is actually touching, so filter tightly to cut O(all_walls)
             # collision checks to O(~4 nearby walls).
             enemy.update(dt, player, all_solid)
+
+            # Check if enemy touches any doors
+            for obj in self.level_objects:
+                if hasattr(obj, 'on_enemy_touch') and obj.active:
+                    if obj.overlaps_circle(enemy.pos, enemy.radius):
+                        obj.on_enemy_touch(enemy)
 
             er = enemy.radius + 4
             ex, ey = enemy.pos.x, enemy.pos.y

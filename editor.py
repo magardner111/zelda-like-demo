@@ -40,6 +40,7 @@ def new_map_data():
                 "wall_regions": [],
                 "stairways": [],
                 "enemies": [],
+                "level_objects": [],
             }
         ],
     }
@@ -72,6 +73,22 @@ FACING_VECTORS = {
     "down": (0, 1), "up": (0, -1), "left": (-1, 0), "right": (1, 0),
 }
 
+# Level object rendering
+ALL_ORIENTATIONS = ["north", "south", "east", "west"]
+DOOR_COLORS = {
+    "north": (101, 67, 33),
+    "south": (101, 67, 33),
+    "east": (101, 67, 33),
+    "west": (101, 67, 33),
+}
+DOOR_DIMENSIONS = {
+    "north": (64, 12),
+    "south": (64, 12),
+    "east": (12, 64),
+    "west": (12, 64),
+}
+ALL_LEVEL_OBJECT_TYPES = ["door"]
+
 
 def rgb_to_hex(r, g, b):
     return f"#{r:02x}{g:02x}{b:02x}"
@@ -97,6 +114,7 @@ def generate_map_code(data):
 
     # Check if any enemies exist
     has_enemies = any(layer.get("enemies") for layer in data["layers"])
+    has_level_objects = any(layer.get("level_objects") for layer in data["layers"])
 
     lines = [
         "from maps.map_base import MapBase",
@@ -119,6 +137,8 @@ def generate_map_code(data):
         if has_facing:
             imports.insert(0, "import pygame")
         lines += imports
+    if has_level_objects:
+        lines.append("from level_objects.door import Door")
     lines += [
         "",
         "",
@@ -213,6 +233,21 @@ def generate_map_code(data):
             lines.append("        self.enemies.append(_e)")
         lines.append("")
 
+    # Level objects (gathered from all layers)
+    all_level_objects = []
+    for layer in data["layers"]:
+        all_level_objects.extend(layer.get("level_objects", []))
+    if all_level_objects:
+        lines.append("        # --- Level Objects ---")
+        for obj in all_level_objects:
+            if obj.get("type") == "door":
+                orientation = obj.get("orientation", "north")
+                lines.append(
+                    f'        self.add_level_object(Door(({obj["x"]}, {obj["y"]}), '
+                    f'orientation="{orientation}"))'
+                )
+        lines.append("")
+
     return "\n".join(lines) + "\n"
 
 
@@ -231,11 +266,13 @@ class MapEditor:
         self.data = new_map_data()
         self.filepath = None  # current JSON save path
         self.active_layer_idx = 0
-        self.tool = "select"  # select | wall | floor | stairway | enemy
+        self.tool = "select"  # select | wall | floor | stairway | enemy | level_object
         self.floor_type = "grass"
         self.enemy_type = ALL_ENEMY_TYPES[0] if ALL_ENEMY_TYPES else "lvl1enemy"
         self.enemy_pattern = "none"
         self.enemy_pattern_params = {}  # current parameter values for placement
+        self.level_object_type = "door"
+        self.door_orientation = "north"
 
         # Tile state
         self.selected_tiles = []        # list of selected tile filenames
@@ -517,6 +554,52 @@ class MapEditor:
 
         edit_frame.columnconfigure(1, weight=1)
 
+        # --- Level Objects tab ---
+        self.level_objects_tab = tk.Frame(self.notebook)
+        self.notebook.add(self.level_objects_tab, text="Level Objects")
+
+        # Placement section
+        self.lo_placement_frame = tk.LabelFrame(self.level_objects_tab, text="Placement", padx=4, pady=4)
+        self.lo_placement_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        tk.Label(self.lo_placement_frame, text="Type:").grid(row=0, column=0, sticky="w")
+        self.lo_type_var = tk.StringVar(value="door")
+        ttk.Combobox(self.lo_placement_frame, textvariable=self.lo_type_var,
+                     values=ALL_LEVEL_OBJECT_TYPES, state="readonly", width=16).grid(row=0, column=1, sticky="ew")
+
+        tk.Label(self.lo_placement_frame, text="Orientation:").grid(row=1, column=0, sticky="w")
+        self.lo_orient_var = tk.StringVar(value="north")
+        ttk.Combobox(self.lo_placement_frame, textvariable=self.lo_orient_var,
+                     values=ALL_ORIENTATIONS, state="readonly", width=16).grid(row=1, column=1, sticky="ew")
+
+        self.lo_placement_frame.columnconfigure(1, weight=1)
+
+        # Selected Level Object section (shown when one is selected)
+        self.sel_lo_frame = tk.LabelFrame(self.level_objects_tab, text="Selected Object", padx=4, pady=4)
+        # Not packed until a level object is selected
+
+        lo_edit_frame = tk.Frame(self.sel_lo_frame)
+        lo_edit_frame.pack(fill=tk.X)
+
+        tk.Label(lo_edit_frame, text="Type:").grid(row=0, column=0, sticky="w")
+        self.lo_prop_type_var = tk.StringVar()
+        tk.Label(lo_edit_frame, textvariable=self.lo_prop_type_var, fg="#666666").grid(row=0, column=1, sticky="w")
+
+        tk.Label(lo_edit_frame, text="Orientation:").grid(row=1, column=0, sticky="w")
+        self.lo_prop_orient_var = tk.StringVar(value="north")
+        self.lo_prop_orient_combo = ttk.Combobox(lo_edit_frame, textvariable=self.lo_prop_orient_var,
+                     values=ALL_ORIENTATIONS, state="readonly", width=16)
+        self.lo_prop_orient_combo.grid(row=1, column=1, sticky="ew")
+
+        tk.Label(lo_edit_frame, text="Position:").grid(row=2, column=0, sticky="w")
+        self.lo_prop_pos_var = tk.StringVar()
+        tk.Label(lo_edit_frame, textvariable=self.lo_prop_pos_var, fg="#666666").grid(row=2, column=1, sticky="w")
+
+        tk.Button(lo_edit_frame, text="Apply", command=self._apply_level_object_props).grid(
+            row=3, column=0, columnspan=2, sticky="ew", pady=(4, 0))
+
+        lo_edit_frame.columnconfigure(1, weight=1)
+
         # Stairway properties (inside tools tab, shown when stairway selected)
         self.stair_frame = tk.LabelFrame(self.tools_tab, text="Stairway Properties", padx=4, pady=4)
         # Not packed until a stairway is selected
@@ -580,6 +663,7 @@ class MapEditor:
         self.root.bind("f", lambda e: self._set_tool("floor"))
         self.root.bind("t", lambda e: self._set_tool("stairway"))
         self.root.bind("e", lambda e: self.notebook.select(self.enemies_tab))
+        self.root.bind("o", lambda e: self.notebook.select(self.level_objects_tab))
         self.root.bind("<Delete>", lambda e: self._delete_selected())
         if IS_MAC:
             self.root.bind("<BackSpace>", lambda e: self._delete_selected())
@@ -750,6 +834,22 @@ class MapEditor:
                     c.create_line(ecx, ecy, ecx + fdx * line_len, ecy + fdy * line_len,
                                   fill="#ff0000", width=2)
 
+            # Level objects (only on active layer)
+            if is_active:
+                for oi, obj in enumerate(layer.get("level_objects", [])):
+                    orient = obj.get("orientation", "north")
+                    dw, dh = DOOR_DIMENSIONS.get(orient, (64, 12))
+                    ox0 = obj["x"] - dw / 2
+                    oy0 = obj["y"] - dh / 2
+                    sx0, sy0 = self._map_to_screen(ox0, oy0)
+                    sx1, sy1 = self._map_to_screen(ox0 + dw, oy0 + dh)
+                    dcolor = rgb_to_hex(*DOOR_COLORS.get(orient, (101, 67, 33)))
+                    c.create_rectangle(sx0, sy0, sx1, sy1, fill=dcolor,
+                                       outline="#ffffff", width=1)
+                    cx, cy = (sx0 + sx1) / 2, (sy0 + sy1) / 2
+                    c.create_text(cx, cy, text=orient[0].upper(), fill="white",
+                                  font=("sans-serif", 7))
+
         # Map border
         c.create_rectangle(x0, y0, x1, y1, outline="#aaaaaa", width=2)
 
@@ -776,6 +876,16 @@ class MapEditor:
                 r = (ENEMY_DRAW_RADIUS + 4) * self.zoom
                 c.create_oval(ecx - r, ecy - r, ecx + r, ecy + r,
                               outline="#ffff00", width=2, dash=(4, 4))
+            elif s_kind == "level_object":
+                # Rect highlight for level objects (no resize handles)
+                orient = s_item.get("orientation", "north")
+                dw, dh = DOOR_DIMENSIONS.get(orient, (64, 12))
+                lox = s_item["x"] - dw / 2
+                loy = s_item["y"] - dh / 2
+                rx0, ry0 = self._map_to_screen(lox, loy)
+                rx1, ry1 = self._map_to_screen(lox + dw, loy + dh)
+                c.create_rectangle(rx0, ry0, rx1, ry1,
+                                   outline="#ffff00", width=2, dash=(4, 4))
             else:
                 rx0, ry0 = self._map_to_screen(s_item["x"], s_item["y"])
                 rx1, ry1 = self._map_to_screen(s_item["x"] + s_item["w"],
@@ -840,6 +950,8 @@ class MapEditor:
             lst = layer.get("enemies", [])
         elif kind == "stairway":
             lst = layer.get("stairways", [])
+        elif kind == "level_object":
+            lst = layer.get("level_objects", [])
         elif kind == "wall":
             lst = layer["wall_regions"]
         else:
@@ -857,6 +969,9 @@ class MapEditor:
 
     def _is_enemies_tab_active(self):
         return self.notebook.select() == str(self.enemies_tab)
+
+    def _is_level_objects_tab_active(self):
+        return self.notebook.select() == str(self.level_objects_tab)
 
     # -----------------------------------------------------------------
     # Canvas interaction
@@ -894,6 +1009,14 @@ class MapEditor:
             else:
                 self.tool = "enemy"
 
+        # Level Objects tab: click object to select, click empty space to place
+        if self._is_level_objects_tab_active() and not override_tool:
+            found = self._hit_test_region(mx, my)
+            if found and found[0] == "level_object":
+                self.tool = "select"
+            else:
+                self.tool = "level_object"
+
         # Stairway tool: click existing stairway to select & edit it
         if self.tool == "stairway" and not override_tool:
             found = self._hit_test_region(mx, my)
@@ -915,10 +1038,19 @@ class MapEditor:
             self._redraw_canvas()
             return
 
+        if self.tool == "level_object":
+            snap = not shift_held
+            ox = self._snap(mx) if snap else int(mx)
+            oy = self._snap(my) if snap else int(my)
+            self._add_level_object(ox, oy)
+            self._refresh_layer_list()
+            self._redraw_canvas()
+            return
+
         if self.tool == "select":
             # Check if clicking a resize handle on current selection
             sel_rect = self._get_selected_rect()
-            if sel_rect and self.selected_items[0][0] != "enemy":
+            if sel_rect and self.selected_items[0][0] not in ("enemy", "level_object"):
                 handle = self._hit_test_handles(event.x, event.y, sel_rect)
                 if handle:
                     self._push_undo()
@@ -931,6 +1063,10 @@ class MapEditor:
             if found and self._is_enemies_tab_active() and found[0] != "enemy":
                 found = None
             if found and not self._is_enemies_tab_active() and found[0] == "enemy":
+                found = None
+            if found and self._is_level_objects_tab_active() and found[0] != "level_object":
+                found = None
+            if found and not self._is_level_objects_tab_active() and found[0] == "level_object":
                 found = None
             if found:
                 kind, idx, layer_idx = found
@@ -1068,8 +1204,10 @@ class MapEditor:
                 found = self._find_regions_in_box(bx, by, bw, bh)
                 if self._is_enemies_tab_active():
                     found = [f for f in found if f[0] == "enemy"]
+                elif self._is_level_objects_tab_active():
+                    found = [f for f in found if f[0] == "level_object"]
                 else:
-                    found = [f for f in found if f[0] != "enemy"]
+                    found = [f for f in found if f[0] not in ("enemy", "level_object")]
                 if shift_held:
                     for item in found:
                         if item in self.selected_items:
@@ -1151,6 +1289,16 @@ class MapEditor:
                 dy = my - en["y"]
                 if dx * dx + dy * dy <= ENEMY_DRAW_RADIUS * ENEMY_DRAW_RADIUS:
                     return ("enemy", i, al)
+            # Check level objects (center ± half dimensions)
+            level_objects = layer.get("level_objects", [])
+            for i in range(len(level_objects) - 1, -1, -1):
+                obj = level_objects[i]
+                orient = obj.get("orientation", "north")
+                dw, dh = DOOR_DIMENSIONS.get(orient, (64, 12))
+                ox = obj["x"] - dw / 2
+                oy = obj["y"] - dh / 2
+                if ox <= mx <= ox + dw and oy <= my <= oy + dh:
+                    return ("level_object", i, al)
             # Check walls (reverse order so topmost drawn gets priority)
             for i in range(len(layer["wall_regions"]) - 1, -1, -1):
                 wr = layer["wall_regions"][i]
@@ -1187,6 +1335,13 @@ class MapEditor:
             for i, sw in enumerate(layer.get("stairways", [])):
                 if self._rects_overlap(bx, by, bw, bh, sw["x"], sw["y"], sw["w"], sw["h"]):
                     found.append(("stairway", i, al))
+            for i, obj in enumerate(layer.get("level_objects", [])):
+                orient = obj.get("orientation", "north")
+                dw, dh = DOOR_DIMENSIONS.get(orient, (64, 12))
+                ox = obj["x"] - dw / 2
+                oy = obj["y"] - dh / 2
+                if self._rects_overlap(bx, by, bw, bh, ox, oy, dw, dh):
+                    found.append(("level_object", i, al))
         return found
 
     def _rects_overlap(self, x1, y1, w1, h1, x2, y2, w2, h2):
@@ -1553,6 +1708,36 @@ class MapEditor:
         self.selected_items = [("enemy", new_idx, self.active_layer_idx)]
         self._update_selection_panel()
 
+    def _add_level_object(self, x, y):
+        if self.active_layer_idx >= len(self.data["layers"]):
+            return
+        layer = self.data["layers"][self.active_layer_idx]
+        obj_type = self.lo_type_var.get()
+        orientation = self.lo_orient_var.get()
+        self._push_undo()
+        layer.setdefault("level_objects", []).append({
+            "type": obj_type,
+            "x": x,
+            "y": y,
+            "orientation": orientation,
+        })
+        self.dirty = True
+        new_idx = len(layer["level_objects"]) - 1
+        self.selected_items = [("level_object", new_idx, self.active_layer_idx)]
+        self._update_selection_panel()
+
+    def _apply_level_object_props(self):
+        if not self.selected_items or self.selected_items[0][0] != "level_object":
+            return
+        obj = self._get_selected_rect()
+        if not obj:
+            return
+        self._push_undo()
+        obj["orientation"] = self.lo_prop_orient_var.get()
+        self.dirty = True
+        self._update_selection_panel()
+        self._redraw_canvas()
+
     # -----------------------------------------------------------------
     # Selection management
     # -----------------------------------------------------------------
@@ -1571,6 +1756,7 @@ class MapEditor:
         item = self._get_selected_rect()
         is_enemy = self.selected_items and self.selected_items[0][0] == "enemy"
         is_stairway = self.selected_items and self.selected_items[0][0] == "stairway"
+        is_level_object = self.selected_items and self.selected_items[0][0] == "level_object"
 
         # Enemies tab: toggle placement vs selected enemy
         if is_enemy and item:
@@ -1589,6 +1775,18 @@ class MapEditor:
         else:
             self.sel_enemy_frame.pack_forget()
             self.placement_frame.pack(fill=tk.X, padx=4, pady=4)
+
+        # Level Objects tab: toggle placement vs selected object
+        if is_level_object and item:
+            self.lo_placement_frame.pack_forget()
+            self.sel_lo_frame.pack(fill=tk.X, padx=4, pady=4)
+            self.notebook.select(self.level_objects_tab)
+            self.lo_prop_type_var.set(item.get("type", "door"))
+            self.lo_prop_orient_var.set(item.get("orientation", "north"))
+            self.lo_prop_pos_var.set(f"({item['x']}, {item['y']})")
+        else:
+            self.sel_lo_frame.pack_forget()
+            self.lo_placement_frame.pack(fill=tk.X, padx=4, pady=4)
 
         # Tools tab: stairway properties
         if is_stairway and item:
@@ -1626,6 +1824,8 @@ class MapEditor:
                 lst = layer.get("enemies", [])
             elif kind == "stairway":
                 lst = layer.get("stairways", [])
+            elif kind == "level_object":
+                lst = layer.get("level_objects", [])
             elif kind == "wall":
                 lst = layer["wall_regions"]
             else:
@@ -1687,6 +1887,9 @@ class MapEditor:
             elif kind == "stairway":
                 layer.setdefault("stairways", []).append(rd)
                 new_idx = len(layer["stairways"]) - 1
+            elif kind == "level_object":
+                layer.setdefault("level_objects", []).append(rd)
+                new_idx = len(layer["level_objects"]) - 1
             elif kind == "wall":
                 layer["wall_regions"].append(rd)
                 new_idx = len(layer["wall_regions"]) - 1
@@ -1712,7 +1915,8 @@ class MapEditor:
             n_wall = len(layer["wall_regions"])
             n_stair = len(layer.get("stairways", []))
             n_enemy = len(layer.get("enemies", []))
-            label = f"Layer {elev}  (F:{n_floor} W:{n_wall} S:{n_stair} E:{n_enemy})"
+            n_lo = len(layer.get("level_objects", []))
+            label = f"Layer {elev}  (F:{n_floor} W:{n_wall} S:{n_stair} E:{n_enemy} O:{n_lo})"
             self.layer_listbox.insert(tk.END, label)
         if self.active_layer_idx < self.layer_listbox.size():
             self.layer_listbox.selection_set(self.active_layer_idx)
@@ -1735,6 +1939,7 @@ class MapEditor:
             "wall_regions": [],
             "stairways": [],
             "enemies": [],
+            "level_objects": [],
         })
         self.dirty = True
         self._refresh_layer_list()
@@ -2486,9 +2691,10 @@ class MapEditor:
         else:
             for layer in self.data["layers"]:
                 layer.setdefault("stairways", [])
-        # Ensure enemies list exists on all layers
+        # Ensure enemies and level_objects lists exist on all layers
         for layer in self.data["layers"]:
             layer.setdefault("enemies", [])
+            layer.setdefault("level_objects", [])
         self.filepath = path
         self.active_layer_idx = 0
         self.dirty = False
