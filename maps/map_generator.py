@@ -132,8 +132,11 @@ def generate_map(layout: Layout):
             layer.add_wall_region(WallRegion(rect, wall_stats))
 
         # --- add doors to doorways ---
+        # Only add doors for north and east to avoid duplicates
+        # (south and west doors are added by the neighboring rooms)
         for direction in open_dirs:
-            add_door_to_doorway(map_obj, rx, ry, direction)
+            if direction in ("north", "east"):
+                add_door_to_doorway(map_obj, rx, ry, direction)
 
         # --- room contents based on layout role ---
         role = layout.graph.nodes[room_id].get("role", RoomRole.NORMAL)
