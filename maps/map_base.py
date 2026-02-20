@@ -369,9 +369,17 @@ class MapBase:
         )
 
         # Add level objects (doors, etc.) as visibility blockers
+        # Only closed doors block visibility; open doors are swung out of the way
         for obj in self.level_objects:
             if obj.active and check.colliderect(obj.rect):
-                wall_rects.append(obj.rect)
+                # Check if object is a door and if it's closed
+                if hasattr(obj, 'state'):
+                    # Door - only block if closed or opening
+                    if obj.state in ('closed', 'opening'):
+                        wall_rects.append(obj.rect)
+                else:
+                    # Other objects always block
+                    wall_rects.append(obj.rect)
 
         self._visibility_poly = compute_visibility_polygon(
             (px, py), wall_rects, self.width, self.height,
