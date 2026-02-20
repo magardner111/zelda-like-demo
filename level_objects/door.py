@@ -76,7 +76,7 @@ class Door(LevelObject):
             self.hinge_offset = (0, -self.door_height / 2)
 
     def on_player_touch(self, player):
-        """Swing door open AWAY from the player's position."""
+        """Swing door into the opposite room from where the player is."""
         if self.state != self.STATE_CLOSED:
             return
 
@@ -84,23 +84,23 @@ class Door(LevelObject):
         dx = player.pos.x - self.pos.x
         dy = player.pos.y - self.pos.y
 
-        # Set swing direction to open AWAY from the player
+        # Set swing direction to open INTO the opposite room (away from player's room)
         if self.orientation == "north":  # Bottom wall (horizontal door)
-            # Player below door (dy > 0) -> swing up (away from player)
-            # Player above door (dy < 0) -> swing down (away from player)
-            self.swing_direction = -1 if dy > 0 else 1
-        elif self.orientation == "south":  # Top wall (horizontal door)
-            # Player above door (dy < 0) -> swing down (away from player)
-            # Player below door (dy > 0) -> swing up (away from player)
+            # Player below door (in current room) -> swing up into northern room
+            # Player above door (in northern room) -> swing down into current room
             self.swing_direction = 1 if dy > 0 else -1
+        elif self.orientation == "south":  # Top wall (horizontal door)
+            # Player above door (in current room) -> swing down into southern room
+            # Player below door (in southern room) -> swing up into current room
+            self.swing_direction = -1 if dy > 0 else 1
         elif self.orientation == "east":  # Right wall (vertical door)
-            # Player right of door (dx > 0) -> swing right (away from player)
-            # Player left of door (dx < 0) -> swing left (away from player)
-            self.swing_direction = -1 if dx > 0 else 1
+            # Player left of door (in current room) -> swing right into eastern room
+            # Player right of door (in eastern room) -> swing left into current room
+            self.swing_direction = 1 if dx < 0 else -1
         elif self.orientation == "west":  # Left wall (vertical door)
-            # Player left of door (dx < 0) -> swing left (away from player)
-            # Player right of door (dx > 0) -> swing right (away from player)
-            self.swing_direction = 1 if dx > 0 else -1
+            # Player right of door (in current room) -> swing left into western room
+            # Player left of door (in western room) -> swing right into current room
+            self.swing_direction = -1 if dx < 0 else 1
 
         self.state = self.STATE_OPENING
 
@@ -120,13 +120,13 @@ class Door(LevelObject):
             dy = source_pos.y - self.pos.y
 
             if self.orientation == "north":
-                self.swing_direction = -1 if dy > 0 else 1
-            elif self.orientation == "south":
                 self.swing_direction = 1 if dy > 0 else -1
+            elif self.orientation == "south":
+                self.swing_direction = -1 if dy > 0 else 1
             elif self.orientation == "east":
-                self.swing_direction = -1 if dx > 0 else 1
+                self.swing_direction = 1 if dx < 0 else -1
             elif self.orientation == "west":
-                self.swing_direction = 1 if dx > 0 else -1
+                self.swing_direction = -1 if dx < 0 else 1
 
             self.state = self.STATE_OPENING
 
