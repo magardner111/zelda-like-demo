@@ -1,7 +1,9 @@
 import random
 
+from core.enemy_base import Enemy
 from core.floor_layer import FloorLayer
-from core.region_base import FloorRegion, WallRegion
+from core.region_base import FloorRegion, ObjectRegion, WallRegion
+from data.enemy_stats import ENEMY_STATS
 from data.region_stats import REGION_STATS
 from maps.layout import Layout, get_direction
 from maps.map_base import MapBase
@@ -127,6 +129,19 @@ def generate_map(layout: Layout):
         # right wall
         for rect in _vwall_rects(rx + ROOM_SIZE - WALL_THICKNESS, ry, "east" in open_dirs):
             layer.add_wall_region(WallRegion(rect, wall_stats))
+
+        # --- room contents based on layout role ---
+        role = layout.graph.nodes[room_id].get("role", "normal")
+        cx, cy = rx + ROOM_SIZE // 2, ry + ROOM_SIZE // 2
+
+        if role == "treasure":
+            chest_size = 32
+            chest_rect = (cx - chest_size // 2, cy - chest_size // 2, chest_size, chest_size)
+            layer.add_floor_region(ObjectRegion(chest_rect, "chest", REGION_STATS["chest"]))
+
+        elif role == "boss":
+            enemy = Enemy((cx, cy), ENEMY_STATS["lvl1enemy"])
+            map_obj.enemies.append(enemy)
 
     # --- player start: centre of room 0 ---
     r0x, r0y    = room_origin(*layout.get_pos(0))
