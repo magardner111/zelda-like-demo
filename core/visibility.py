@@ -1,4 +1,5 @@
 import math
+import numpy as np
 
 
 def compute_visibility_polygon(player_pos, wall_rects, map_width, map_height):
@@ -37,67 +38,81 @@ def compute_visibility_polygon(player_pos, wall_rects, map_width, map_height):
         segments.append((boundary_corners[i], boundary_corners[(i + 1) % 4]))
     points.update(boundary_corners)
 
-    # Cast rays: for each corner, cast 3 rays (corner angle ± tiny offset)
+    if not segments:
+        return []
+
+    # Build segment arrays: shape (N_segs,)
+    seg_arr = np.array(segments, dtype=np.float64)  # (N_segs, 2, 2)
+    ax = seg_arr[:, 0, 0]
+    ay = seg_arr[:, 0, 1]
+    sdx = seg_arr[:, 1, 0] - ax  # segment direction x
+    sdy = seg_arr[:, 1, 1] - ay  # segment direction y
+
+    # Cast rays: for each corner, cast 3 rays (corner angle +/- tiny offset)
     epsilon = 0.0001
     ray_angles = []
     for (cx, cy) in points:
         angle = math.atan2(cy - py, cx - px)
         ray_angles.extend([angle - epsilon, angle, angle + epsilon])
 
-    # For each ray angle, find the nearest intersection
-    intersections = []
-    for angle in ray_angles:
-        rdx = math.cos(angle)
-        rdy = math.sin(angle)
+    ray_angles = np.array(ray_angles, dtype=np.float64)
+    rdx = np.cos(ray_angles)  # (N_rays,)
+    rdy = np.sin(ray_angles)  # (N_rays,)
 
-        closest_t = float("inf")
-        closest_point = None
+    # Vectorized ray-segment intersection via broadcasting: (N_rays, N_segs)
+    # denom = rdx * sdy - rdy * sdx
+    denom = rdx[:, np.newaxis] * sdy[np.newaxis, :] - rdy[:, np.newaxis] * sdx[np.newaxis, :]
 
-        for (ax, ay), (bx, by) in segments:
-            hit = _ray_segment_intersect(px, py, rdx, rdy, ax, ay, bx, by)
-            if hit is not None:
-                t, ix, iy = hit
-                if t < closest_t:
-                    closest_t = t
-                    closest_point = (ix, iy)
+    # Offsets from ray origin to each segment start
+    dx = ax[np.newaxis, :] - px  # broadcasts to (N_rays, N_segs)
+    dy = ay[np.newaxis, :] - py
 
-        if closest_point is not None:
-            intersections.append((angle, closest_point))
+    # t = (dx * sdy - dy * sdx) / denom  — distance along ray
+    # u = (dx * rdy - dy * rdx) / denom  — position along segment [0,1]
+    t_num = dx * sdy[np.newaxis, :] - dy * sdx[np.newaxis, :]
+    u_num = dx * rdy[:, np.newaxis] - dy * rdx[:, np.newaxis]
 
-    # Sort by angle and return the polygon points
-    intersections.sort(key=lambda item: item[0])
-    return [pt for _, pt in intersections]
+    # Avoid division by zero for near-parallel rays
+    parallel = np.abs(denom) < 1e-10
+    safe_denom = np.where(parallel, 1.0, denom)
+
+    t = t_num / safe_denom
+    u = u_num / safe_denom
+
+    # Mask invalid hits: parallel, t < 0, u outside [0,1]
+    t[parallel | (t < 0) | (u < 0) | (u > 1)] = np.inf
+
+    # Nearest hit per ray
+    closest_t = np.min(t, axis=1)  # (N_rays,)
+
+    # Compute intersection points
+    hit_x = px + rdx * closest_t
+    hit_y = py + rdy * closest_t
+
+    # Filter rays that hit nothing
+    valid = np.isfinite(closest_t)
+    valid_angles = ray_angles[valid]
+    valid_x = hit_x[valid]
+    valid_y = hit_y[valid]
+
+    # Sort by angle and return polygon points
+    sort_idx = np.argsort(valid_angles)
+    return list(zip(valid_x[sort_idx].tolist(), valid_y[sort_idx].tolist()))
 
 
 def point_in_polygon(x, y, polygon):
-    """Ray-casting point-in-polygon test."""
-    n = len(polygon)
-    inside = False
-    j = n - 1
-    for i in range(n):
-        xi, yi = polygon[i]
-        xj, yj = polygon[j]
-        if ((yi > y) != (yj > y)) and (x < (xj - xi) * (y - yi) / (yj - yi) + xi):
-            inside = not inside
-        j = i
-    return inside
+    """Ray-casting point-in-polygon test (numpy vectorized)."""
+    poly = np.array(polygon, dtype=np.float64)
+    xi = poly[:, 0]
+    yi = poly[:, 1]
+    xj = np.roll(xi, 1)
+    yj = np.roll(yi, 1)
 
+    # Edge crossing: yi and yj on opposite sides of y
+    crossing = (yi > y) != (yj > y)
+    # Safe division — when crossing is True, yj != yi is guaranteed
+    dy = yj - yi
+    safe_dy = np.where(dy == 0.0, 1.0, dy)
+    x_intersect = (xj - xi) * (y - yi) / safe_dy + xi
 
-def _ray_segment_intersect(px, py, rdx, rdy, ax, ay, bx, by):
-    """Intersect ray (px,py)+t*(rdx,rdy) with segment (ax,ay)-(bx,by).
-
-    Returns (t, ix, iy) or None.
-    """
-    sdx = bx - ax
-    sdy = by - ay
-
-    denom = rdx * sdy - rdy * sdx
-    if abs(denom) < 1e-10:
-        return None
-
-    t = ((ax - px) * sdy - (ay - py) * sdx) / denom
-    u = ((ax - px) * rdy - (ay - py) * rdx) / denom
-
-    if t >= 0 and 0 <= u <= 1:
-        return (t, px + rdx * t, py + rdy * t)
-    return None
+    return int(np.sum(crossing & (x < x_intersect))) % 2 == 1
