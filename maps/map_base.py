@@ -57,6 +57,7 @@ class MapBase:
         self.width = width
         self.height = height
         self.enemies = []
+        self.explosions = []
         self.floor_layers = []
         self.stairways = []
         self.level_objects = []           # Interactable objects like doors, chests
@@ -267,6 +268,16 @@ class MapBase:
             # collision checks to O(~4 nearby walls).
             enemy.update(dt, player, all_solid)
 
+            # Spawn explosion if the enemy flagged one this frame
+            if getattr(enemy, '_pending_explosion', False):
+                from core.explosion import Explosion
+                params = getattr(enemy, '_explosion_params', {})
+                entities = [player] + self.enemies
+                self.explosions.append(
+                    Explosion(enemy.pos, enemy.current_layer, entities, **params)
+                )
+                enemy._pending_explosion = False
+
             # Check if enemy touches any doors
             for obj in self.level_objects:
                 if hasattr(obj, 'on_enemy_touch') and obj.active:
@@ -287,6 +298,10 @@ class MapBase:
             self.check_edge_slide(enemy, dt)
 
             self.check_fall(enemy)
+
+        for exp in self.explosions:
+            exp.update(dt)
+        self.explosions = [e for e in self.explosions if not e.done]
 
         self.enemies = [e for e in self.enemies if e.health > 0]
 

@@ -145,6 +145,12 @@ def main():
                     camera.shake(*entity._pending_shake)
                     entity._pending_shake = None
 
+            # Drain pending camera shakes from explosions
+            for exp in current_map.explosions:
+                if exp._pending_shake is not None:
+                    camera.shake(*exp._pending_shake)
+                    exp._pending_shake = None
+
             # Level object interactions (doors, chests, etc.)
             # Check BEFORE collision resolution so player can trigger doors on touch
             current_map.check_level_object_interactions(player)
@@ -213,6 +219,11 @@ def main():
                 enemy.draw(screen, camera)
 
             player.draw(screen, camera)
+
+            for exp in current_map.explosions:
+                if exp.layer == player.current_layer:
+                    exp.draw(screen, camera)
+
             current_map.draw_walls(screen, camera, player.current_layer)
             current_map.draw_visibility(screen, camera, player)
             hud.draw(screen)
