@@ -231,6 +231,20 @@ def main():
 
             current_map.draw_walls(screen, camera, player.current_layer)
             current_map.draw_visibility(screen, camera, player)
+
+            # Speech bubbles above all world geometry, walls, and effects
+            for enemy in current_map.enemies:
+                if enemy.current_layer != player.current_layer:
+                    continue
+                if enemy.visibility_alpha <= 0:
+                    continue
+                if current_map.room_bounds:
+                    enemy_room = current_map.get_room_at(enemy.pos.x, enemy.pos.y)
+                    if enemy_room is not None and enemy_room not in current_map.visited_rooms:
+                        continue
+                enemy._draw_speech(screen, camera)
+            player._draw_speech(screen, camera)
+
             hud.draw(screen)
 
         pygame.display.flip()

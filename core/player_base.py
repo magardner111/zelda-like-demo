@@ -276,5 +276,3 @@ class Player(GameObject):
         # Draw Projectiles
         for p in self.projectiles:
             p.draw(screen, camera)
-
-        self._draw_speech(screen, camera)

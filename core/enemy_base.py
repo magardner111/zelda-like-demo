@@ -203,8 +203,6 @@ class Enemy(GameObject):
         line_end = screen_pos + self.facing * self.size
         pygame.draw.line(screen, (255, 0, 0), screen_pos, line_end, 2)
 
-        self._draw_speech(screen, camera)
-
 
 def _line_clear(x1, y1, x2, y2, regions):
     """True if no solid region blocks the line segment (Liang-Barsky)."""
