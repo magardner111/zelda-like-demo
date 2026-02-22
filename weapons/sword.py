@@ -108,7 +108,7 @@ class Sword:
                         collision_rect = obj.get_collision_rect() if hasattr(obj, 'get_collision_rect') else obj.rect
                         if collision_rect.collidepoint(int(tip.x), int(tip.y)):
                             # Apply angular impulse to door (pass player position for direction)
-                            obj.apply_force(600.0, self.owner.pos)  # degrees per second
+                            obj.apply_force(1200.0, self.owner.pos)  # degrees per second
                             self.hit_this_swing = True
                             break
 

@@ -208,18 +208,18 @@ def add_door_to_doorway(map_obj, room_x, room_y, direction, room_id=None, neighb
     door_center_x = 0
     door_center_y = 0
 
-    # Position door in the center of the doorway frame
+    # Position door at the room boundary (center of the 32px combined wall)
     if direction == "north":  # Bottom wall
         door_center_x = room_x + ROOM_SIZE // 2
-        door_center_y = room_y + ROOM_SIZE - WALL_THICKNESS // 2
+        door_center_y = room_y + ROOM_SIZE
     elif direction == "south":  # Top wall
         door_center_x = room_x + ROOM_SIZE // 2
-        door_center_y = room_y + WALL_THICKNESS // 2
+        door_center_y = room_y
     elif direction == "east":  # Right wall
-        door_center_x = room_x + ROOM_SIZE - WALL_THICKNESS // 2
+        door_center_x = room_x + ROOM_SIZE
         door_center_y = room_y + ROOM_SIZE // 2
     elif direction == "west":  # Left wall
-        door_center_x = room_x + WALL_THICKNESS // 2
+        door_center_x = room_x
         door_center_y = room_y + ROOM_SIZE // 2
 
     door = Door((door_center_x, door_center_y), orientation=direction,

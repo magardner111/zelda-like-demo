@@ -11,6 +11,7 @@ class Door(LevelObject):
     STATE_CLOSED = "closed"
     STATE_OPENING = "opening"
     STATE_OPEN = "open"
+    STATE_CLOSING = "closing"
 
     def __init__(self, position, orientation="north", connected_rooms=None):
         """Create a swinging door.
@@ -47,51 +48,80 @@ class Door(LevelObject):
         self.swing_angle = 0.0  # Current rotation angle (0 = closed, 90 = open)
         self.angular_velocity = 0.0  # degrees per second (physics-based)
         self.target_angle = 0.0
-        self.swing_speed = 300.0  # degrees per second (for touch-to-open)
+        self.swing_speed = 200.0  # degrees per second (for touch/close)
         self.swing_direction = 1  # 1 for clockwise, -1 for counter-clockwise
         self.just_opened = False  # Set to True when door finishes opening
+        self.solid = False  # Player walks through — door opens on contact
 
         # Physics properties
-        self.max_angle = 89.0  # Stop just before perpendicular to wall
-        self.rest_angle = 85.0  # Angle where door settles when open
-        self.rest_threshold = 5.0  # Velocity threshold to snap to rest angle
-        self.bounce_factor = 0.3  # How much velocity is retained on bounce (low for quick settling)
+        self.max_angle = 110.0  # Allow door to overshoot past perpendicular
+        self.rest_angle = 100.0  # Settle slightly past perpendicular
         self.friction = 0.92  # Velocity multiplier per frame (damping)
-        self.rest_friction = 0.7  # Extra damping near rest angle
         self.impact_threshold = 80.0  # Min velocity for impact effects (camera shake)
+        self.door_damage = 3
+        self.door_knockback = 350
+        self._enemies_hit_this_swing = set()  # avoid repeat hits per swing
+        self._sword_hit = False  # only sword hits cause impact/damage
+        self._sword_impact = False  # camera shake on sword connect
 
         # Determine hinge position based on orientation
         # Hinge is on the side closest to the wall
         self._setup_hinge()
 
     def _setup_hinge(self):
-        """Set up hinge point - at center of doorway (door's position)."""
-        # Hinge is exactly in the middle of the doorway, at the door's center position
-        self.hinge_offset = (0, 0)
+        """Set up hinge point at the edge of the door (on a wall)."""
+        if self.orientation in ("north", "south"):
+            # Horizontal door - hinge on left side
+            self.hinge_offset = (-self.door_width / 2, 0)
+        else:
+            # Vertical door - hinge on top side
+            self.hinge_offset = (0, -self.door_height / 2)
+
+    def _swing_direction_from(self, source_pos):
+        """Return +1 or -1 so the door swings away from *source_pos*.
+
+        Horizontal doors (north/south wall): hinge at left edge, door extends
+        right.  Positive rotation swings the far end downward (increasing y).
+          - source above (dy < 0) → swing down (+1)
+          - source below (dy > 0) → swing up   (-1)
+
+        Vertical doors (east/west wall): hinge at top edge, door extends down.
+        Positive rotation swings the far end to the left (decreasing x).
+          - source to the right (dx > 0) → swing left  (+1)
+          - source to the left  (dx < 0) → swing right (-1)
+        """
+        if self.orientation in ("north", "south"):
+            dy = source_pos.y - self.pos.y if hasattr(source_pos, 'y') else source_pos[1] - self.pos.y
+            return 1 if dy < 0 else -1
+        else:
+            dx = source_pos.x - self.pos.x if hasattr(source_pos, 'x') else source_pos[0] - self.pos.x
+            return -1 if dx < 0 else 1
 
     def on_player_touch(self, player):
         """Door swings away from player like pushing a door open."""
         if self.state != self.STATE_CLOSED:
             return
 
-        # Determine which side the player is on relative to the door
-        dx = player.pos.x - self.pos.x
-        dy = player.pos.y - self.pos.y
+        self.swing_direction = self._swing_direction_from(player.pos)
+        self._enemies_hit_this_swing = set()
 
-        # Door swings away from player
-        # Hinge is at center, door extends to one side, rotation swings it away
-        if self.orientation in ("north", "south"):  # Horizontal door
-            # Door extends left from hinge
-            # Player on left (north) -> swing right/clockwise (positive) to move away
-            # Player on right (south) -> swing left/counter-clockwise (negative) to move away
-            self.swing_direction = 1 if dx < 0 else -1
-        else:  # Vertical door
-            # Door extends up from hinge
-            # Player above (west/left) -> swing down/clockwise (positive) to move away
-            # Player below (east/right) -> swing up/counter-clockwise (negative) to move away
-            self.swing_direction = 1 if dy < 0 else -1
+        # Dashing through a door slams it open like a sword hit
+        if getattr(player, 'dodge_remaining', 0) > 0:
+            self.state = self.STATE_OPENING
+            self.angular_velocity = player.dodge_speed * 1.5
+            self._sword_hit = True
+            player._pending_shake = (0.05, 4)
+        else:
+            self.state = self.STATE_OPENING
 
+    def on_enemy_touch(self, enemy):
+        """Door swings away from enemy like pushing a door open."""
+        if self.state != self.STATE_CLOSED:
+            return
+
+        self.swing_direction = self._swing_direction_from(enemy.pos)
         self.state = self.STATE_OPENING
+        self._enemies_hit_this_swing = set()
 
     def apply_force(self, angular_impulse, source_pos):
         """Apply an angular impulse to the door (e.g., from sword hit).
@@ -103,21 +133,22 @@ class Door(LevelObject):
         source_pos : Vector2
             Position of the force source (player) to determine swing direction
         """
-        # Determine swing direction if door is closed (same logic as on_player_touch)
+        self._enemies_hit_this_swing = set()
+        self._sword_hit = True
+        self._sword_impact = True
+
         if self.state == self.STATE_CLOSED:
-            dx = source_pos.x - self.pos.x
-            dy = source_pos.y - self.pos.y
-
-            # Door swings away from player
-            if self.orientation in ("north", "south"):  # Horizontal door
-                self.swing_direction = 1 if dx < 0 else -1
-            else:  # Vertical door
-                self.swing_direction = 1 if dy < 0 else -1
-
+            # Open: swing away from source
+            self.swing_direction = self._swing_direction_from(source_pos)
             self.state = self.STATE_OPENING
-
-        # Add to angular velocity (physics-based swinging)
-        self.angular_velocity += angular_impulse * self.swing_direction
+            self.angular_velocity += angular_impulse
+        elif self.state in (self.STATE_OPEN, self.STATE_OPENING):
+            # Slam closed
+            self.state = self.STATE_CLOSING
+            self.angular_velocity = -angular_impulse
+        elif self.state == self.STATE_CLOSING:
+            # Already closing — add more force
+            self.angular_velocity -= angular_impulse
 
     def get_visibility_rect(self):
         """Get the axis-aligned bounding box of the door in its current rotation.
@@ -130,13 +161,10 @@ class Door(LevelObject):
             self.pos.y + self.hinge_offset[1]
         )
 
-        # Calculate the four corners of the door rectangle
-        if self.orientation in ("north", "south"):
-            half_w = self.door_width / 2
-            half_h = self.door_height / 2
-        else:
-            half_w = self.door_width / 2
-            half_h = self.door_height / 2
+        # Calculate the four corners of the door rectangle (same as draw method)
+        # Corners are defined relative to door center
+        half_w = self.door_width / 2
+        half_h = self.door_height / 2
 
         corners = [
             (-half_w, -half_h),
@@ -177,76 +205,89 @@ class Door(LevelObject):
         return self.get_visibility_rect()
 
     def update(self, dt):
-        """Update door swing animation with physics."""
-        self.impact_this_frame = False  # Reset impact flag
+        """Update door swing animation."""
+        self.impact_this_frame = False
 
-        if self.state == self.STATE_OPENING or self.state == self.STATE_OPEN:
-            # Physics-based swinging with angular velocity
-            if abs(self.angular_velocity) > 0.1:
-                # Update angle based on velocity
-                self.swing_angle += self.angular_velocity * dt
-
-                # Apply friction/damping (stronger near rest angle)
-                base_friction = self.friction
-                if abs(self.swing_angle - self.rest_angle) < 10.0:
-                    # Extra damping near rest position to settle quickly
-                    base_friction = self.rest_friction
-                self.angular_velocity *= base_friction
-
-                # Snap to rest angle if close and moving slowly
-                if (abs(self.swing_angle - self.rest_angle) < 3.0 and
-                    abs(self.angular_velocity) < self.rest_threshold):
-                    self.swing_angle = self.rest_angle
-                    self.angular_velocity = 0.0
-                    self.state = self.STATE_OPEN
-                    if not self.just_opened:
-                        self.just_opened = True
-
-                # Stop at max angle (no bounce, just absorb)
-                elif self.swing_angle >= self.max_angle:
-                    self.swing_angle = self.max_angle
-                    # Slow bounce for hard hits, otherwise just stop
-                    if abs(self.angular_velocity) > self.impact_threshold:
-                        self.angular_velocity = -self.angular_velocity * self.bounce_factor
-                        self.impact_this_frame = True
-                    else:
-                        self.angular_velocity = 0.0
-
-                    if not self.just_opened:
-                        self.just_opened = True
-                        self.state = self.STATE_OPEN
-
-                # Bounce off closed position
-                elif self.swing_angle <= 0:
-                    self.swing_angle = 0
-                    self.angular_velocity = -self.angular_velocity * self.bounce_factor
-
-                    if abs(self.angular_velocity) > self.impact_threshold:
-                        self.impact_this_frame = True
-
-                # Check if door reached open position for first time
-                elif self.swing_angle >= self.rest_angle and not self.just_opened:
-                    self.just_opened = True
-                    self.state = self.STATE_OPEN
-
-            else:
-                # No velocity - use simple animation for touch-to-open
-                if abs(self.swing_angle - self.rest_angle) > 0.1:
-                    delta = self.swing_speed * dt
-                    if self.swing_angle < self.rest_angle:
-                        self.swing_angle = min(self.swing_angle + delta, self.rest_angle)
-                    else:
-                        self.swing_angle = max(self.swing_angle - delta, self.rest_angle)
-                else:
-                    # Finished opening
-                    self.swing_angle = self.rest_angle
-                    self.state = self.STATE_OPEN
-                    if not self.just_opened:
-                        self.just_opened = True
-
-        elif self.state == self.STATE_CLOSED:
+        if self.state == self.STATE_CLOSED:
             self.swing_angle = 0.0
             self.angular_velocity = 0.0
+            return
+
+        # --- door is moving ---
+
+        if abs(self.angular_velocity) > 0.1:
+            # Physics-driven (sword hit)
+            self.swing_angle += self.angular_velocity * dt
+            self.angular_velocity *= self.friction
+
+            # Clamp at max angle
+            if self.swing_angle >= self.max_angle:
+                self.swing_angle = self.max_angle
+                if self._sword_hit and abs(self.angular_velocity) > self.impact_threshold:
+                    self.impact_this_frame = True
+                self.angular_velocity = 0.0
+
+            # Reached closed position
+            if self.swing_angle <= 0:
+                self.swing_angle = 0.0
+                self.angular_velocity = 0.0
+                self.state = self.STATE_CLOSED
+                self.just_opened = False
+                self._enemies_hit_this_swing = set()
+                self._sword_hit = False
+                return
+        else:
+            # Smooth animation toward target
+            self.angular_velocity = 0.0
+            target = 0.0 if self.state == self.STATE_CLOSING else self.rest_angle
+            delta = self.swing_speed * dt
+            if self.swing_angle < target:
+                self.swing_angle = min(self.swing_angle + delta, target)
+            elif self.swing_angle > target:
+                self.swing_angle = max(self.swing_angle - delta, target)
+
+            # Finished closing
+            if self.state == self.STATE_CLOSING and self.swing_angle <= 0.1:
+                self.swing_angle = 0.0
+                self.state = self.STATE_CLOSED
+                self.just_opened = False
+                self._enemies_hit_this_swing = set()
+                self._sword_hit = False
+                return
+
+        # Mark open once we reach the rest angle
+        if self.state == self.STATE_OPENING and self.swing_angle >= self.rest_angle:
+            if not self.just_opened:
+                self.just_opened = True
+            self.state = self.STATE_OPEN
+            self._enemies_hit_this_swing = set()
+            self._sword_hit = False
+
+    def check_enemy_collisions(self, enemies):
+        """Damage enemies hit by a swinging door (sword hits only)."""
+        if not self._sword_hit:
+            return
+        if self.state not in (self.STATE_OPENING, self.STATE_CLOSING):
+            return
+
+        door_rect = self.get_collision_rect()
+        hinge_world = pygame.Vector2(
+            self.pos.x + self.hinge_offset[0],
+            self.pos.y + self.hinge_offset[1],
+        )
+
+        for enemy in enemies:
+            if id(enemy) in self._enemies_hit_this_swing:
+                continue
+            if enemy.health <= 0:
+                continue
+            # Circle-vs-rect overlap
+            closest_x = max(door_rect.left, min(enemy.pos.x, door_rect.right))
+            closest_y = max(door_rect.top, min(enemy.pos.y, door_rect.bottom))
+            dist_sq = (enemy.pos.x - closest_x) ** 2 + (enemy.pos.y - closest_y) ** 2
+            if dist_sq < enemy.size ** 2:
+                enemy.take_damage(self.door_damage, hinge_world, self.door_knockback)
+                self._enemies_hit_this_swing.add(id(enemy))
 
     def draw(self, screen, camera):
         """Draw the swinging door."""
@@ -262,26 +303,15 @@ class Door(LevelObject):
         )
         hinge_screen = camera.apply(pygame.Vector2(hinge_world))
 
-        # Calculate the four corners of the door rectangle before rotation
-        # Door extends from hinge (at center) in one direction
-        if self.orientation in ("north", "south"):
-            # Horizontal door - extends left from hinge at center
-            half_h = self.door_height / 2
-            corners = [
-                (-self.door_width, -half_h),  # Far left top
-                (0, -half_h),                  # Hinge top
-                (0, half_h),                   # Hinge bottom
-                (-self.door_width, half_h)    # Far left bottom
-            ]
-        else:
-            # Vertical door - extends up from hinge at center
-            half_w = self.door_width / 2
-            corners = [
-                (-half_w, -self.door_height),  # Top left
-                (half_w, -self.door_height),   # Top right
-                (half_w, 0),                    # Hinge right
-                (-half_w, 0)                    # Hinge left
-            ]
+        # Four corners of the door rectangle relative to door center
+        half_w = self.door_width / 2
+        half_h = self.door_height / 2
+        corners = [
+            (-half_w, -half_h),
+            ( half_w, -half_h),
+            ( half_w,  half_h),
+            (-half_w,  half_h),
+        ]
 
         # Apply rotation around hinge point
         angle_rad = math.radians(self.swing_angle * self.swing_direction)
