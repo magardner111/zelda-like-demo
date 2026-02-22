@@ -109,6 +109,24 @@ _QUIPS = [
 ]
 
 
+_THROW_GRUNTS = [
+    "[speed:0.07] REEEE!!",
+    "[speed:0.07] *wheeze*",
+    "[speed:0.07] TAKE THAT!!",
+    "[speed:0.07] hhhHH!!",
+    "[speed:0.07] LOGGED!!",
+    "[speed:0.07] REPORTED!!",
+    "[speed:0.07] EAT ROCK!!",
+    "[speed:0.07] *wheeze* LOGGED!!",
+    "[speed:0.07] REEEE!! *wheeze*",
+    "[speed:0.07] THAT'S A WARNING!!",
+    "[speed:0.07] BANNED!!",
+    "[speed:0.07] RULE VIOLATION!!",
+    "[speed:0.07] ROCK LAW!!",
+    "[speed:0.07] FEEL MY WRATH!!",
+    "[speed:0.07] *wheeze* DIE!!",
+]
+
 _ENRAGE_QUIPS = [
     # Named final attacks — DBZ power-up energy
     "FINAL ATTACK: MODERATOR EXTINCTION BEAM!! THIS IS MY ULTIMATE TECHNIQUE!! REEEEEEEEE!!",
@@ -288,6 +306,14 @@ class AnnoyingKid(Enemy):
                         Rock(self.pos, direction, dist, self.current_layer)
                     )
                     self._holding_rock = False
+                    # Short grunt on throw. Only queue one at a time to prevent
+                    # pile-up. Roughly 1-in-3 times also queue a normal quip
+                    # after the grunt so regular lines slip in between throws.
+                    if not self._speech._queue:
+                        pages = [random.choice(_THROW_GRUNTS)]
+                        if random.random() < 0.35:
+                            pages.append(random.choice(_QUIPS))
+                        self.say(pages)
             else:
                 self._rock_timer -= dt
                 if self._rock_timer <= 0:
