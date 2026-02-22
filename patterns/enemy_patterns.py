@@ -151,10 +151,17 @@ class KeepDistancePattern(PatternBase):
 # =====================================================
 
 class KamikazePattern(PatternBase):
-    """Charge directly at the player at full speed with no distance check.
+    """Charge at the player with optional periodic homing corrections.
+
+    On the first update the enemy locks onto the player and commits to
+    travelling 110 % of that distance.  If ``homing > 0`` the heading is
+    re-locked every ``1 / homing`` seconds, resetting the committed distance
+    from the new position.  When the committed distance is exceeded the
+    pattern sets ``should_explode = True`` so the owning enemy can detonate
+    even on a clean miss.
 
     Explosion parameters are stored here so the owning enemy can read
-    them when it creates an ``Explosion`` on contact.
+    them when it creates an ``Explosion``.
 
     Parameters
     ----------
@@ -166,24 +173,62 @@ class KamikazePattern(PatternBase):
         Damage forwarded to ``Explosion``.
     explode_shake : tuple | None
         ``(duration, intensity)`` forwarded to ``Explosion``.
+    homing : float
+        Heading re-locks per second.  ``0`` = straight line after the
+        initial lock.  Low values (default 0.15) give only the occasional
+        mid-flight correction; high values track the player aggressively.
     """
 
     def __init__(self, speed=500, explode_radius=80, explode_damage=3,
-                 explode_shake=(0.25, 20)):
+                 explode_shake=(0.25, 20), homing=0.15):
         self.speed = speed
         self.explode_radius = explode_radius
         self.explode_damage = explode_damage
         self.explode_shake = explode_shake
+        self.homing = homing
         self.player = None
-        self.line_of_sight = True  # set each frame by the owning enemy (unused here)
+        self.line_of_sight = True  # unused; kept for interface consistency
+
+        self._heading = None            # locked unit direction vector
+        self._last_adj_pos = None       # enemy pos at last heading lock
+        self._committed_dist = 0.0      # 1.1 × dist-to-player at last lock
+        self._adj_timer = 0.0
+        self._adj_interval = (1.0 / homing) if homing > 0 else float('inf')
+        self.should_explode = False     # read by the owning enemy
+
+    def _lock_heading(self, enemy):
+        """Re-aim at the player, record position, and reset committed distance."""
+        to_player = self.player.pos - enemy.pos
+        dist = to_player.length()
+        if dist < 1.0:
+            self.should_explode = True
+            return
+        self._heading = to_player / dist
+        self._last_adj_pos = pygame.Vector2(enemy.pos)
+        self._committed_dist = dist * 1.1
+        self._adj_timer = 0.0
 
     def update(self, enemy, dt, speed_factor=1.0):
         if self.player is None:
             return
-        to_player = self.player.pos - enemy.pos
-        dist = to_player.length()
-        if dist < 1.0:
+
+        # Initial heading lock on first call
+        if self._heading is None:
+            self._lock_heading(enemy)
+            if self.should_explode:
+                return
+
+        # Advance along the locked heading
+        enemy.pos += self._heading * self.speed * speed_factor * dt
+        enemy.facing = pygame.Vector2(self._heading)
+
+        # Detonate when 110 % of the committed distance is covered
+        if (enemy.pos - self._last_adj_pos).length() >= self._committed_dist:
+            self.should_explode = True
             return
-        direction = to_player / dist
-        enemy.facing = pygame.Vector2(direction)
-        enemy.pos += direction * self.speed * speed_factor * dt
+
+        # Periodic homing correction
+        if self.homing > 0:
+            self._adj_timer += dt
+            if self._adj_timer >= self._adj_interval:
+                self._lock_heading(enemy)

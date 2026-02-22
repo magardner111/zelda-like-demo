@@ -266,7 +266,7 @@ class AnnoyingKid(Enemy):
             self.pattern.player = player
             self.pattern.update(self, dt)
 
-            if (player.pos - self.pos).length() <= 10:
+            if (player.pos - self.pos).length() <= 10 or self.pattern.should_explode:
                 self._explosion_params = {
                     'radius': self.pattern.explode_radius,
                     'damage': self.pattern.explode_damage,
