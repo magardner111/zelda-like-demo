@@ -13,6 +13,9 @@ class Door(LevelObject):
     # Speed multiplier while player is pushing door open
     PUSH_SPEED_FACTOR = 0.3
 
+    # Door swing speed multiplier when opened by a sneaking player
+    SNEAK_SWING_FACTOR = 0.4
+
     # Animation states
     STATE_CLOSED = "closed"
     STATE_OPENING = "opening"
@@ -71,6 +74,7 @@ class Door(LevelObject):
         self._sword_impact = False  # camera shake on sword connect
         self.player_pushing = False  # True from push-open until door reaches open state
         self._pushing_enemy = None   # Enemy that pushed door open (slowed until open)
+        self._sneak_opened = False   # Door swings slower when opened by sneaking player
 
         # Determine hinge position based on orientation
         # Hinge is on the side closest to the wall
@@ -122,6 +126,7 @@ class Door(LevelObject):
         else:
             self.state = self.STATE_OPENING
             self.player_pushing = True
+            self._sneak_opened = getattr(player, 'sneaking', False)
 
     def on_enemy_touch(self, enemy):
         """Door swings away from enemy like pushing a door open."""
@@ -250,7 +255,10 @@ class Door(LevelObject):
             # Smooth animation toward target
             self.angular_velocity = 0.0
             target = 0.0 if self.state == self.STATE_CLOSING else self.rest_angle
-            delta = self.swing_speed * dt
+            speed = self.swing_speed
+            if self._sneak_opened:
+                speed *= self.SNEAK_SWING_FACTOR
+            delta = speed * dt
             if self.swing_angle < target:
                 self.swing_angle = min(self.swing_angle + delta, target)
             elif self.swing_angle > target:
@@ -274,6 +282,7 @@ class Door(LevelObject):
             self._sword_hit = False
             self.player_pushing = False
             self._pushing_enemy = None
+            self._sneak_opened = False
 
     def check_enemy_collisions(self, enemies):
         """Damage enemies hit by a swinging door (sword hits only)."""
