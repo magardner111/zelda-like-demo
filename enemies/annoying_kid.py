@@ -2,7 +2,7 @@ import random
 
 from core.enemy_base import Enemy, _line_clear
 from core.speech_bubble import SpeechBubble
-from patterns.enemy_patterns import KeepDistancePattern
+from patterns.enemy_patterns import KeepDistancePattern, KamikazePattern
 
 # ---------------------------------------------------------------------------
 # Quip library
@@ -105,6 +105,32 @@ _QUIPS = [
 ]
 
 
+_ENRAGE_QUIPS = [
+    "SEE YOU IN HELL!! REEEEEEEEEEE!!",
+    "I'M TAKING YOU WITH ME!! REEEEEEEEEEEEE!!",
+    "YOU WILL PERISH WITH ME YOU BASTARD-FLAVORED NIGHTMARE!! REEEEEEE!!",
+    "FINE!! IF I GO DOWN YOU GO DOWN!! REEEEEEEEEEE!!",
+    "TO HELL WITH BOTH OF US YOU ABSOLUTE SHIT-COMET!! REEEEEEEEEEEEEEE!!",
+    "BANNED FROM LIFE ITSELF!! REEEEEEEEEEE!!",
+    "YOU'LL REGRET THIS IN HELL YOU MOIST FUCKING WEDNESDAY!! REEEEEEEEEEE!!",
+    "THIS IS THE FINAL REPORT YOU SCROTUM-ADJACENT DISASTER!! REEEEEEE!!",
+    "COME TO HELL WITH ME YOU TREMENDOUS PISS-RECTANGLE!! REEEEEEEEEEE!!",
+    "I AM TAKING YOU TO HELL AND YOU ARE GOING TO HATE IT!! REEEEEEE!!",
+    "DIE WITH ME YOU ABSOLUTE TURBO-BASTARD!! REEEEEEEEEEEEEEE!!",
+    "YOU UNGODLY FUCK-TRAPEZOID!! SEE YOU IN HELL!! REEEEEEEEEEE!!",
+    "I HAVE NOTHING LEFT TO LOG!! REEEEEEEEEEEEE!!",
+    "WE ARE GOING TO HELL AND I AM DRIVING!! REEEEEEEEEEE!!",
+    "YOU CATASTROPHIC ASS-LANTERN!! BURN WITH ME!! REEEEEEEEEEEEE!!",
+    "TELL MY WAIFU I LOVE HER!! REEEEEEEEEEE!!",
+    "TELL MY DISCORD KITTEN I DIDN'T CRY!! [pause:0.3] I DIDN'T!! REEEEEEEEE!!",
+    "SOMEONE TELL MY WAIFU I DIED WITH HONOR!! THIS IS HONOR!! REEEEEEE!!",
+    "TELL MY DISCORD KITTEN THE RESTRAINING ORDER WAS WORTH IT!! REEEEEEEEEEE!!",
+    "TELL MY WAIFU BODY PILLOW I LOVE HER AND I'M SORRY!! REEEEEEEEEEE!!",
+    "SOMEONE TELL MY DISCORD KITTEN I WASN'T CRYING I WAS LOGGING!! REEEEEEE!!",
+    "TELL MY WAIFU I FOUGHT VALIANTLY!! THIS IS VALIANTLY!! REEEEEEEEEEEEE!!",
+]
+
+
 class AnnoyingKid(Enemy):
     """A very fast enemy that orbits the player at a safe distance and won't
     shut up about how ugly and bad at fighting the player is.
@@ -142,6 +168,11 @@ class AnnoyingKid(Enemy):
         # Stagger the first quip so multiple kids don't all talk at once
         self._quip_timer = random.uniform(0.2, 1.5)
 
+        # Enrage / kamikaze state
+        self._enraged = False
+        self._pending_explosion = False
+        self._explosion_params = {}
+
     # =====================================================
     # UPDATE
     # =====================================================
@@ -154,23 +185,42 @@ class AnnoyingKid(Enemy):
             self._update_speech(dt)
             return
 
-        # Movement — always track the player at a distance.
-        # Pass line-of-sight so the pattern can switch between orbiting
-        # (clear path) and direct pursuit (wall in the way → find the doorway).
+        # Enrage check — switch to kamikaze when HP drops to ≤60%
+        if not self._enraged and self.health <= self.max_health * 0.6:
+            self._enraged = True
+            self.pattern = KamikazePattern(speed=500)
+            self.say([random.choice(_ENRAGE_QUIPS)])
+
+        # Movement
         self.pattern.player = player
-        self.pattern.line_of_sight = _line_clear(
-            self.pos.x, self.pos.y,
-            player.pos.x, player.pos.y,
-            solid_regions,
-        )
+        if not self._enraged:
+            self.pattern.line_of_sight = _line_clear(
+                self.pos.x, self.pos.y,
+                player.pos.x, player.pos.y,
+                solid_regions,
+            )
         self.pattern.update(self, dt)
 
-        # Quips — fire whenever the bubble goes idle
-        self._quip_timer -= dt
-        if self._quip_timer <= 0:
-            if not self._speech.is_active:
-                self.say([random.choice(_QUIPS)])
-            self._quip_timer = random.uniform(0.2, 1.2)
+        # Kamikaze contact check — explode when within 10px of the player
+        if self._enraged:
+            dist = (player.pos - self.pos).length()
+            if dist <= 10:
+                self._explosion_params = {
+                    'radius': self.pattern.explode_radius,
+                    'damage': self.pattern.explode_damage,
+                    'shake': self.pattern.explode_shake,
+                }
+                self._pending_explosion = True
+                self.health = 0
+                return
+
+        # Quips — only when not enraged
+        if not self._enraged:
+            self._quip_timer -= dt
+            if self._quip_timer <= 0:
+                if not self._speech.is_active:
+                    self.say([random.choice(_QUIPS)])
+                self._quip_timer = random.uniform(0.2, 1.2)
 
         self._update_knockback(dt)
 

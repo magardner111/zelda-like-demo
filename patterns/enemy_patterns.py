@@ -142,3 +142,46 @@ class KeepDistancePattern(PatternBase):
 
             perp = pygame.Vector2(-direction.y, direction.x) * self._orbit_dir
             enemy.pos += perp * self.speed * 0.25 * dt
+
+
+# =====================================================
+# KAMIKAZE PATTERN
+# =====================================================
+
+class KamikazePattern(PatternBase):
+    """Charge directly at the player at full speed with no distance check.
+
+    Explosion parameters are stored here so the owning enemy can read
+    them when it creates an ``Explosion`` on contact.
+
+    Parameters
+    ----------
+    speed : float
+        Movement speed in pixels per second.
+    explode_radius : float
+        Damage radius forwarded to ``Explosion``.
+    explode_damage : int
+        Damage forwarded to ``Explosion``.
+    explode_shake : tuple | None
+        ``(duration, intensity)`` forwarded to ``Explosion``.
+    """
+
+    def __init__(self, speed=500, explode_radius=80, explode_damage=3,
+                 explode_shake=(0.25, 20)):
+        self.speed = speed
+        self.explode_radius = explode_radius
+        self.explode_damage = explode_damage
+        self.explode_shake = explode_shake
+        self.player = None
+        self.line_of_sight = True  # set each frame by the owning enemy (unused here)
+
+    def update(self, enemy, dt):
+        if self.player is None:
+            return
+        to_player = self.player.pos - enemy.pos
+        dist = to_player.length()
+        if dist < 1.0:
+            return
+        direction = to_player / dist
+        enemy.facing = pygame.Vector2(direction)
+        enemy.pos += direction * self.speed * dt
