@@ -45,6 +45,7 @@ from core.visibility import compute_visibility_polygon, point_in_polygon
 from data.enemy_stats import ENEMY_STATS
 from data.pattern_registry import PATTERN_REGISTRY, get_pattern_class
 from data.region_stats import REGION_STATS
+from level_objects.door import Door
 
 # Region type -> class mapping (matches editor categories)
 _LIQUID_TYPES = {"water", "lava"}
@@ -225,7 +226,7 @@ class MapBase:
 
             # Sword hit: camera shake on connect
             if hasattr(obj, '_sword_impact') and obj._sword_impact:
-                player._pending_shake = (0.05, 4)
+                player._pending_shake = Door.SLAM_SHAKE
                 obj._sword_impact = False
 
             # Check if any doors impacted (bounce off wall) - shake camera and alert enemies

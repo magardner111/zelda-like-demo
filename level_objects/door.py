@@ -7,6 +7,9 @@ from level_objects.level_object_base import LevelObject
 class Door(LevelObject):
     """A geometric door that swings open away from the player."""
 
+    # Camera shake applied on sword hit and dash slam (duration, intensity)
+    SLAM_SHAKE = (0.25, 20)
+
     # Animation states
     STATE_CLOSED = "closed"
     STATE_OPENING = "opening"
@@ -110,7 +113,7 @@ class Door(LevelObject):
             self.state = self.STATE_OPENING
             self.angular_velocity = player.dodge_speed * 1.5
             self._sword_hit = True
-            player._pending_shake = (0.25, 20)
+            player._pending_shake = self.SLAM_SHAKE
         else:
             self.state = self.STATE_OPENING
 
