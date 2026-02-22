@@ -3,7 +3,7 @@ ENEMY_STATS = {
         "size": 14,
         "radius": 10,
         "speed": 0,
-        "max_health": 500,
+        "max_health": 5,
         "color": (255, 160, 0),      # obnoxious orange
         "hit_damage": 1,
         "alert_radius": 9999,        # always aware of the player

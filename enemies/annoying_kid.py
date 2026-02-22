@@ -134,7 +134,7 @@ class AnnoyingKid(Enemy):
         )
 
         self.pattern = KeepDistancePattern(
-            min_dist=200,
+            min_dist=100,
             max_dist=370,
             speed=350,
         )
