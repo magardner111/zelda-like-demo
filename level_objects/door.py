@@ -110,7 +110,7 @@ class Door(LevelObject):
             self.state = self.STATE_OPENING
             self.angular_velocity = player.dodge_speed * 1.5
             self._sword_hit = True
-            player._pending_shake = (0.05, 4)
+            player._pending_shake = (0.25, 20)
         else:
             self.state = self.STATE_OPENING
 
