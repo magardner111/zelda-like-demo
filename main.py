@@ -1,4 +1,7 @@
 import argparse
+import json
+from pathlib import Path
+
 import pygame
 import sys
 
@@ -72,7 +75,29 @@ def main():
         current_map.mark_current_room_visited(player)
     camera.set_bounds(current_map.width, current_map.height)
     options = GameOptions()
-    menu = MainMenu(options=options)
+
+    # ----- Config persistence -----
+    config_path = Path(__file__).parent / "game.config"
+
+    def save_config():
+        cfg = {
+            "controls": input_manager.save_to_dict(),
+            "options": options.save_to_dict(),
+        }
+        with open(config_path, "w") as f:
+            json.dump(cfg, f, indent=2)
+
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                cfg = json.load(f)
+            input_manager.load_from_dict(cfg.get("controls", {}))
+            options.load_from_dict(cfg.get("options", {}))
+        except (json.JSONDecodeError, OSError):
+            pass  # corrupt or unreadable config — start with defaults
+
+    menu = MainMenu(options=options, input_manager=input_manager,
+                     quit_callback=save_config, close_callback=save_config)
     hud = GameHud(player, options=options, fps_source=clock.get_fps)
 
     running = True
@@ -85,6 +110,7 @@ def main():
         # -----------------------------
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                save_config()
                 running = False
 
         # -----------------------------

@@ -19,9 +19,16 @@ class Menu:
         self.font = pygame.font.SysFont(None, self.font_size)
         self.item_rects = []
 
+        self._prev_enter = False
+        self._prev_click = False
+
     def open(self):
         self.active = True
         self.selected_index = 0
+        # Suppress any held keys / mouse buttons so the press that opened
+        # this menu doesn't immediately trigger an item.
+        self._prev_enter = True
+        self._prev_click = True
         pygame.event.set_grab(False)
         pygame.mouse.set_visible(True)
 
@@ -35,10 +42,16 @@ class Menu:
         if not self.active:
             return
 
-        # Keyboard navigation
+        # Navigation via mapped move keys (WASD or remapped)
         if input_manager.is_pressed("move_up"):
             self.selected_index = (self.selected_index - 1) % len(self.items)
         if input_manager.is_pressed("move_down"):
+            self.selected_index = (self.selected_index + 1) % len(self.items)
+
+        # Arrow keys always work for menu navigation regardless of remapping
+        if input_manager.keys[pygame.K_UP] and not input_manager.prev_keys[pygame.K_UP]:
+            self.selected_index = (self.selected_index - 1) % len(self.items)
+        if input_manager.keys[pygame.K_DOWN] and not input_manager.prev_keys[pygame.K_DOWN]:
             self.selected_index = (self.selected_index + 1) % len(self.items)
 
         # Mouse hover detection
@@ -48,20 +61,14 @@ class Menu:
                 self.selected_index = i
                 break
 
-        # Activation via Enter key
-        keys = pygame.key.get_pressed()
-        if input_manager.is_pressed("sword"):  # space acts as confirm too
+        # Confirm: Enter/Space on keyboard, B/Y on gamepad
+        if input_manager.is_pressed("menu_confirm"):
             self._trigger(self.selected_index)
             return
 
-        # Enter key (not in keymap, check directly)
-        if keys[pygame.K_RETURN] and not getattr(self, '_prev_enter', False):
-            self._trigger(self.selected_index)
-        self._prev_enter = keys[pygame.K_RETURN]
-
         # Mouse click
         if pygame.mouse.get_pressed()[0]:
-            if not getattr(self, '_prev_click', False):
+            if not self._prev_click:
                 for i, rect in enumerate(self.item_rects):
                     if rect.collidepoint(mouse_pos):
                         self._trigger(i)

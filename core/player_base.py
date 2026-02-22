@@ -160,6 +160,16 @@ class Player(GameObject):
     # =====================================================
 
     def _update_facing(self, input_manager, camera):
+        # Right stick updates facing when deflected
+        if input_manager.right_stick.length_squared() > 0:
+            self.facing = pygame.Vector2(input_manager.right_stick)
+            return
+
+        # Once the right stick has been used, keep the last stick facing
+        # until the mouse physically moves again.
+        if input_manager.right_stick_active:
+            return
+
         mouse_screen = input_manager.get_mouse_pos()
         mouse_world = mouse_screen - camera.offset
         direction = mouse_world - self.pos
