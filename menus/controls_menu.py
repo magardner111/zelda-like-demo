@@ -60,6 +60,7 @@ class ControlsMenu(Menu):
         self._prev_keys_raw = None        # snapshot for key bind mode
         self._prev_buttons_raw = None     # snapshot for button bind mode
         self._open_tick = 0
+        self._last_input_mode = input_manager.input_mode
 
         items = self._build_items()
         config = {"font_size": 36, "item_spacing": 45}
@@ -200,6 +201,11 @@ class ControlsMenu(Menu):
         # Cooldown: ignore all input briefly after opening
         if pygame.time.get_ticks() - self._open_tick < OPEN_COOLDOWN_MS:
             return
+
+        # Auto-rebuild when input mode changes (e.g. controller plugged in)
+        if self._input_manager.input_mode != self._last_input_mode:
+            self._last_input_mode = self._input_manager.input_mode
+            self._rebuild()
 
         if self._binding_action is not None:
             if self._binding_type == "key":
