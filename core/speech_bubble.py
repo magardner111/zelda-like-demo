@@ -92,6 +92,15 @@ class SpeechBubble:
         """True while any text is being displayed or queued."""
         return self._state != 'idle'
 
+    @property
+    def progress(self):
+        """Fraction of the current page's words revealed (0.0–1.0).
+
+        Returns 1.0 when idle or in hold state (all words shown)."""
+        if self._state != 'typing' or not self._schedule:
+            return 1.0
+        return self._sched_idx / len(self._schedule)
+
     # ------------------------------------------------------------------
     # Update / Draw
     # ------------------------------------------------------------------

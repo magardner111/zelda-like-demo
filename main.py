@@ -255,6 +255,10 @@ def main():
                 if exp.layer == player.current_layer:
                     exp.draw(screen, camera)
 
+            for rock in current_map.rocks:
+                if rock.layer == player.current_layer:
+                    rock.draw(screen, camera)
+
             current_map.draw_walls(screen, camera, player.current_layer)
             current_map.draw_visibility(screen, camera, player)
 

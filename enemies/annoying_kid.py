@@ -1,7 +1,11 @@
+import math
 import random
+
+import pygame
 
 from core.enemy_base import Enemy, _line_clear
 from core.speech_bubble import SpeechBubble
+from enemies.rock import Rock
 from patterns.enemy_patterns import KeepDistancePattern, KamikazePattern
 
 # ---------------------------------------------------------------------------
@@ -166,7 +170,7 @@ class AnnoyingKid(Enemy):
         # Obnoxious yellow speech, fast talker — 3 rows × 46 cols so even his
         # longest rants fit without dropping words
         self._speech = SpeechBubble(
-            word_interval=0.28,
+            word_interval=0.224,
             duration=2.2,
             color=(255, 230, 30),
             rows=3,
@@ -181,6 +185,12 @@ class AnnoyingKid(Enemy):
 
         # Stagger the first quip so multiple kids don't all talk at once
         self._quip_timer = random.uniform(0.2, 1.5)
+
+        # Rock-throwing state (normal phase only)
+        self._rock_timer = 0.7
+        self._rock_windup = 0.0
+        self._holding_rock = False
+        self._pending_rocks = []
 
         # Enrage / kamikaze state
         self._enraged = False
@@ -233,8 +243,8 @@ class AnnoyingKid(Enemy):
                 self._flash_cycle -= flash_period
                 self.flash_timer = flash_period * 0.5
 
-            # Transition: minimum time elapsed AND speech bubble finished
-            if self._windup_timer >= _WINDUP_MIN and not self._speech.is_active:
+            # Transition: minimum time elapsed AND speech bubble mostly done
+            if self._windup_timer >= _WINDUP_MIN and self._speech.progress >= 0.8:
                 self._winding_up = False
                 self.pattern = KamikazePattern(speed=500, explode_damage=6, explode_radius=120)
                 self.flash_timer = 0.0
@@ -261,6 +271,30 @@ class AnnoyingKid(Enemy):
                     self.say([random.choice(_QUIPS)])
                 self._quip_timer = random.uniform(0.2, 1.2)
 
+            # Rock throwing
+            if self._holding_rock:
+                self._rock_windup += dt
+                if self._rock_windup >= 0.5:
+                    # Fire the rock toward the player with wide angular spread
+                    to_player = player.pos - self.pos
+                    dist = to_player.length()
+                    if dist > 1.0:
+                        direction = to_player / dist
+                    else:
+                        direction = pygame.Vector2(0, 1)
+                    angle_offset = math.radians(random.uniform(-40, 40))
+                    direction = direction.rotate_rad(angle_offset)
+                    self._pending_rocks.append(
+                        Rock(self.pos, direction, dist, self.current_layer)
+                    )
+                    self._holding_rock = False
+            else:
+                self._rock_timer -= dt
+                if self._rock_timer <= 0:
+                    self._holding_rock = True
+                    self._rock_windup = 0.0
+                    self._rock_timer = 0.7
+
         # ── Kamikaze charge phase ─────────────────────────────────────────────
         else:
             self.pattern.player = player
@@ -282,3 +316,15 @@ class AnnoyingKid(Enemy):
             self.flash_timer -= dt
 
         self._update_speech(dt)
+
+    # =====================================================
+    # DRAW
+    # =====================================================
+
+    def draw(self, screen, camera):
+        super().draw(screen, camera)
+        if self._holding_rock and not self.falling and not self.landing:
+            screen_pos = pygame.Vector2(camera.apply(self.pos))
+            rock_pos = (int(screen_pos.x - self.size),
+                        int(screen_pos.y - self.size))
+            pygame.draw.circle(screen, (140, 120, 90), rock_pos, 4)
