@@ -128,6 +128,11 @@ def main():
             # Apply liquid/effect regions
             speed_factor = apply_region_effects(player, effect_regions, dt)
 
+            # Slow player while pushing a door open
+            for obj in current_map.level_objects:
+                if getattr(obj, 'player_pushing', False):
+                    speed_factor *= obj.PUSH_SPEED_FACTOR
+
             # Filter enemies to same layer
             enemies_on_layer = [
                 e for e in current_map.enemies

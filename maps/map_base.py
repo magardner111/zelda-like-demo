@@ -262,11 +262,17 @@ class MapBase:
             if dist_sq > _ENEMY_CULL_DIST_SQ:
                 continue
 
+            # Slow enemy while it pushes a door open
+            enemy_speed_factor = 1.0
+            for obj in self.level_objects:
+                if getattr(obj, '_pushing_enemy', None) is enemy:
+                    enemy_speed_factor *= Door.PUSH_SPEED_FACTOR
+
             # enemy.update needs the full solid list for line-of-sight detection
             # (sneak mechanic). resolve_entity_vs_regions only needs walls the
             # enemy is actually touching, so filter tightly to cut O(all_walls)
             # collision checks to O(~4 nearby walls).
-            enemy.update(dt, player, all_solid)
+            enemy.update(dt, player, all_solid, enemy_speed_factor)
 
             # Spawn explosion if the enemy flagged one this frame
             if getattr(enemy, '_pending_explosion', False):

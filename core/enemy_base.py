@@ -56,7 +56,7 @@ class Enemy(GameObject):
     # UPDATE
     # =====================================================
 
-    def update(self, dt, player, solid_regions):
+    def update(self, dt, player, solid_regions, speed_factor=1.0):
         # Fall / landing animation
         if self._update_fall(dt):
             if self.flash_timer > 0:
@@ -72,7 +72,7 @@ class Enemy(GameObject):
                 self.alert_timer = self.alert_cooldown
                 self._last_known_player_pos = pygame.Vector2(player.pos)
             elif self.pattern:
-                self.pattern.update(self, dt)
+                self.pattern.update(self, dt, speed_factor)
         elif self.phase == "alerted":
             if detected:
                 self._last_known_player_pos = pygame.Vector2(player.pos)
@@ -87,7 +87,7 @@ class Enemy(GameObject):
                 if direction.length_squared() > 0:
                     direction = direction.normalize()
                     self.facing = pygame.Vector2(direction)
-                    self.pos += direction * self.chase_speed * dt
+                    self.pos += direction * self.chase_speed * speed_factor * dt
 
             if self.alert_timer <= 0:
                 self.phase = "pattern"

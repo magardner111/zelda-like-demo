@@ -6,7 +6,7 @@ import pygame
 # =====================================================
 
 class PatternBase:
-    def update(self, enemy, dt):
+    def update(self, enemy, dt, speed_factor=1.0):
         raise NotImplementedError
 
 
@@ -29,13 +29,13 @@ class UpDownPattern(PatternBase):
         self.start_pos = None
         self.pause_timer = 0.0
 
-    def update(self, enemy, dt):
+    def update(self, enemy, dt, speed_factor=1.0):
         if self.start_pos is None:
             self.start_pos = pygame.Vector2(enemy.pos)
 
         if self.state == "moving_up":
             enemy.facing = pygame.Vector2(0, -1)
-            enemy.pos.y -= self.speed * dt
+            enemy.pos.y -= self.speed * speed_factor * dt
 
             if enemy.pos.y <= self.start_pos.y - self.distance:
                 enemy.pos.y = self.start_pos.y - self.distance
@@ -49,7 +49,7 @@ class UpDownPattern(PatternBase):
 
         elif self.state == "moving_down":
             enemy.facing = pygame.Vector2(0, 1)
-            enemy.pos.y += self.speed * dt
+            enemy.pos.y += self.speed * speed_factor * dt
 
             if enemy.pos.y >= self.start_pos.y:
                 enemy.pos.y = self.start_pos.y
@@ -94,7 +94,7 @@ class KeepDistancePattern(PatternBase):
         self._orbit_timer = 0.0
         self._orbit_switch = 2.0   # seconds between orbit direction flips
 
-    def update(self, enemy, dt):
+    def update(self, enemy, dt, speed_factor=1.0):
         if self.player is None:
             return
 
@@ -106,13 +106,15 @@ class KeepDistancePattern(PatternBase):
         direction = to_player / dist  # unit vector toward player
         enemy.facing = pygame.Vector2(direction)
 
+        spd = self.speed * speed_factor
+
         if dist < self.min_dist:
             # Too close — back away
-            enemy.pos -= direction * self.speed * dt
+            enemy.pos -= direction * spd * dt
 
         elif dist > self.max_dist or not self.line_of_sight:
             # Move directly toward player; collision system pushes us along walls.
-            enemy.pos += direction * self.speed * dt
+            enemy.pos += direction * spd * dt
 
             # When a wall blocks line of sight, also apply lateral correction so
             # the enemy slides along the wall toward the doorway gap rather than
@@ -124,12 +126,12 @@ class KeepDistancePattern(PatternBase):
                     # Moving mostly left/right → wall is vertical → align on Y
                     lat = self.player.pos.y - enemy.pos.y
                     if abs(lat) > 1.0:
-                        enemy.pos.y += (1.0 if lat > 0 else -1.0) * self.speed * 0.6 * dt
+                        enemy.pos.y += (1.0 if lat > 0 else -1.0) * spd * 0.6 * dt
                 else:
                     # Moving mostly up/down → wall is horizontal → align on X
                     lat = self.player.pos.x - enemy.pos.x
                     if abs(lat) > 1.0:
-                        enemy.pos.x += (1.0 if lat > 0 else -1.0) * self.speed * 0.6 * dt
+                        enemy.pos.x += (1.0 if lat > 0 else -1.0) * spd * 0.6 * dt
 
         else:
             # Sweet spot with clear line of sight — orbit perpendicular.
@@ -141,7 +143,7 @@ class KeepDistancePattern(PatternBase):
                 self._orbit_timer = 0.0
 
             perp = pygame.Vector2(-direction.y, direction.x) * self._orbit_dir
-            enemy.pos += perp * self.speed * 0.25 * dt
+            enemy.pos += perp * spd * 0.25 * dt
 
 
 # =====================================================
@@ -175,7 +177,7 @@ class KamikazePattern(PatternBase):
         self.player = None
         self.line_of_sight = True  # set each frame by the owning enemy (unused here)
 
-    def update(self, enemy, dt):
+    def update(self, enemy, dt, speed_factor=1.0):
         if self.player is None:
             return
         to_player = self.player.pos - enemy.pos
@@ -184,4 +186,4 @@ class KamikazePattern(PatternBase):
             return
         direction = to_player / dist
         enemy.facing = pygame.Vector2(direction)
-        enemy.pos += direction * self.speed * dt
+        enemy.pos += direction * self.speed * speed_factor * dt

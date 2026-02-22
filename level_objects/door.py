@@ -8,7 +8,10 @@ class Door(LevelObject):
     """A geometric door that swings open away from the player."""
 
     # Camera shake applied on sword hit and dash slam (duration, intensity)
-    SLAM_SHAKE = (0.25, 20)
+    SLAM_SHAKE = (0.2, 10)
+
+    # Speed multiplier while player is pushing door open
+    PUSH_SPEED_FACTOR = 0.3
 
     # Animation states
     STATE_CLOSED = "closed"
@@ -66,6 +69,8 @@ class Door(LevelObject):
         self._enemies_hit_this_swing = set()  # avoid repeat hits per swing
         self._sword_hit = False  # only sword hits cause impact/damage
         self._sword_impact = False  # camera shake on sword connect
+        self.player_pushing = False  # True from push-open until door reaches open state
+        self._pushing_enemy = None   # Enemy that pushed door open (slowed until open)
 
         # Determine hinge position based on orientation
         # Hinge is on the side closest to the wall
@@ -116,6 +121,7 @@ class Door(LevelObject):
             player._pending_shake = self.SLAM_SHAKE
         else:
             self.state = self.STATE_OPENING
+            self.player_pushing = True
 
     def on_enemy_touch(self, enemy):
         """Door swings away from enemy like pushing a door open."""
@@ -125,6 +131,7 @@ class Door(LevelObject):
         self.swing_direction = self._swing_direction_from(enemy.pos)
         self.state = self.STATE_OPENING
         self._enemies_hit_this_swing = set()
+        self._pushing_enemy = enemy
 
     def apply_force(self, angular_impulse, source_pos):
         """Apply an angular impulse to the door (e.g., from sword hit).
@@ -265,6 +272,8 @@ class Door(LevelObject):
             self.state = self.STATE_OPEN
             self._enemies_hit_this_swing = set()
             self._sword_hit = False
+            self.player_pushing = False
+            self._pushing_enemy = None
 
     def check_enemy_collisions(self, enemies):
         """Damage enemies hit by a swinging door (sword hits only)."""

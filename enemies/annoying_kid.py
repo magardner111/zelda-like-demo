@@ -194,7 +194,7 @@ class AnnoyingKid(Enemy):
     # UPDATE
     # =====================================================
 
-    def update(self, dt, player, solid_regions):
+    def update(self, dt, player, solid_regions, speed_factor=1.0):
         # Fall / landing — keep speech ticking but skip movement
         if self._update_fall(dt):
             if self.flash_timer > 0:
@@ -253,7 +253,7 @@ class AnnoyingKid(Enemy):
                 player.pos.x, player.pos.y,
                 solid_regions,
             )
-            self.pattern.update(self, dt)
+            self.pattern.update(self, dt, speed_factor)
 
             self._quip_timer -= dt
             if self._quip_timer <= 0:
