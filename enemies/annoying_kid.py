@@ -236,7 +236,7 @@ class AnnoyingKid(Enemy):
             # Transition: minimum time elapsed AND speech bubble finished
             if self._windup_timer >= _WINDUP_MIN and not self._speech.is_active:
                 self._winding_up = False
-                self.pattern = KamikazePattern(speed=500)
+                self.pattern = KamikazePattern(speed=500, explode_damage=6, explode_radius=120)
                 self.flash_timer = 0.0
 
             self._update_knockback(dt)
