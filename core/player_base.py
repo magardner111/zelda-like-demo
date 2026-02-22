@@ -170,17 +170,18 @@ class Player(GameObject):
     # DAMAGE
     # =====================================================
 
-    def take_damage(self, amount, source_position):
+    def take_damage(self, amount, source_position, knockback=0):
         if self.invuln_timer > 0:
             return
 
         self.health -= amount
         self.invuln_timer = self.invuln_time
 
+        force = knockback if knockback > 0 else self.knockback_force
         direction = self.pos - source_position
         if direction.length_squared() > 0:
             direction = direction.normalize()
-            self.vel = direction * self.knockback_force
+            self.vel = direction * force
             self.knockback_timer = 0.2
 
     # =====================================================
