@@ -6,7 +6,7 @@ ENEMY_STATS = {
         "max_health": 5,
         "color": (255, 160, 0),      # obnoxious orange
         "hit_damage": 1,
-        "alert_radius": 9999,        # always aware of the player
+        "alert_radius": 1000,        # always aware of the player
         "chase_speed": 270,
         "knockback_resistance": 0,
         "alert_cooldown": 0.0,
